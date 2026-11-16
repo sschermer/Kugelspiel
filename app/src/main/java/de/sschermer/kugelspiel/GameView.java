@@ -427,10 +427,19 @@ final class GameView extends View {
         paint.setTextAlign(Paint.Align.CENTER);paint.setTypeface(Typeface.DEFAULT_BOLD);
         paint.setTextSize(24);paint.setColor(0xffffffff);
         c.drawText(open?"✓":"🔒",xx,(CEILING+FLOOR)*.5f+8,paint);
-        if(!open){
-            paint.setTextSize(18);
-            c.drawText(score+" / "+data().target,xx,(CEILING+FLOOR)*.5f+80,paint);
-        }
+        // The exit itself shows the *remaining* points, not just the total.
+        // Always visible in world space; updates instantly after each pickup.
+        int missing=Math.max(0,data().target-score);
+        String gateLabel=open?"OFFEN":"NOCH "+missing+(missing==1?" PUNKT":" PUNKTE");
+        float labelY=(CEILING+FLOOR)*.5f+103;
+        paint.setTypeface(Typeface.DEFAULT_BOLD);
+        paint.setTextSize(21);
+        float halfWidth=Math.max(69,paint.measureText(gateLabel)*.5f+15);
+        paint.setColor(0xde102632);
+        c.drawRoundRect(new RectF(xx-halfWidth,labelY-31,
+                xx+halfWidth,labelY+12),9,9,paint);
+        paint.setColor(open?0xff9affe0:0xffffd4c7);
+        c.drawText(gateLabel,xx,labelY,paint);
         paint.setTextAlign(Paint.Align.LEFT);
     }
     private void drawSphere(Canvas c){
