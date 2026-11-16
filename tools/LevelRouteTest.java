@@ -1,83 +1,122 @@
 package de.sschermer.kugelspiel;
 
-import java.util.*;
+import java.util.List;
 
 /**
- * Symbolic reachability regression tests.
- * Each horizontal track is connected via an explicit gravity item.
- * Jump timing is deliberately not needed to solve any puzzle.
- * The solver models persistent color/gravity state and repeatable contact items.
+ * Deterministic design checks. The solver enumerates one-path-per-branch
+ * combinations; it does not simulate Android touch input or precise physics.
  */
 public final class LevelRouteTest {
-    private static final class Node {
-        final float x;
-        final LevelData.Item item;
-        final LevelData.Gate gate;
-        Node(float x,LevelData.Item item,LevelData.Gate gate){this.x=x;this.item=item;this.gate=gate;}
+    private static void require(boolean condition,String problem) {
+        if(!condition)throw new AssertionError(problem);
     }
-    private static final class State {
-        final int pos,color,gravity;
-        final boolean back;
-        State(int pos,int color,int gravity,boolean back) {
-            this.pos=pos;this.color=color;this.gravity=gravity;this.back=back;
+    private static boolean near(float a,float b){return Math.abs(a-b)<0.15f;}
+
+    private static LevelData.Item item(LevelData.Level level,int type,int lane,float x) {
+        for(LevelData.Item i:level.items) {
+            if(i.type==type && i.lane==lane && near(i.x,x))return i;
         }
-        @Override public int hashCode(){return Objects.hash(pos,color,gravity,back);}
-        @Override public boolean equals(Object other) {
-            if(!(other instanceof State))return false;
-            State s=(State)other;
-            return pos==s.pos&&color==s.color&&gravity==s.gravity&&back==s.back;
-        }
+        throw new AssertionError(level.name+": item missing at "+x);
     }
-    private static void check(LevelData.Level level,int index) {
-        ArrayList<Node> nodes=new ArrayList<>();
-        nodes.add(new Node(100,null,null));
-        for(LevelData.Item i:level.items)nodes.add(new Node(i.x,i,null));
-        for(LevelData.Gate g:level.gates)nodes.add(new Node(g.x,null,g));
-        nodes.add(new Node(level.finish,null,null));
-        nodes.sort(Comparator.comparingDouble(n->n.x));
-        HashSet<Float> unique=new HashSet<>();
-        for(Node n:nodes){
-            if(!unique.add(n.x))throw new AssertionError("Two objects at x="+n.x);
-            if(n.x<100||n.x>level.finish)throw new AssertionError("Object outside level");
+    private static LevelData.Gate gate(LevelData.Level level,int lane,float x) {
+        for(LevelData.Gate g:level.gates) {
+            if(g.lane==lane&&near(g.x,x))return g;
         }
-        Queue<State> queue=new ArrayDeque<>();
-        HashSet<State> visited=new HashSet<>();
-        queue.add(new State(0,LevelData.NONE,LevelData.DOWN,false));
-        boolean found=false,foundWithBacktrack=false,foundWithoutBacktrack=false;
-        int iterations=0;
-        while(!queue.isEmpty()) {
-            State state=queue.remove();
-            if(!visited.add(state))continue;
-            if(++iterations>20000)throw new AssertionError("Solver runaway");
-            if(state.pos==nodes.size()-1) {
-                found=true;
-                if(state.back)foundWithBacktrack=true; else foundWithoutBacktrack=true;
-                continue;
+        throw new AssertionError(level.name+": gate missing at "+x);
+    }
+    private static void structural(LevelData.Level lvl,int number) {
+        require(lvl.finish>900,"Level "+number+": too short");
+        require(lvl.availablePoints()>=lvl.target,
+                "Level "+number+": cannot collect sufficient points");
+        require(lvl.target>0,"Level "+number+": target must be positive");
+        for(LevelData.Item i:lvl.items) {
+            require(i.x>130 && i.x<lvl.finish-90,
+                    "Level "+number+": inaccessible item at "+i.x);
+            if(i.once())require(i.value==1||i.value==5||i.value==10,
+                    "Level "+number+": point denomination");
+        }
+        for(LevelData.Gate g:lvl.gates)
+            require(g.x>150&&g.x<lvl.finish-70,"Level "+number+": gate outside bounds");
+        for(LevelData.Segment gap:lvl.gaps)
+            require(gap.to-gap.from<=85 && gap.to>gap.from,
+                    "Level "+number+": too large/invalid gap");
+        for(LevelData.Branch b:lvl.branches) {
+            require(b.lower!=b.upper,"Level "+number+": different path scores required");
+            require(b.x+1020<lvl.finish,"Level "+number+": branch not inside world");
+            require(item(lvl,LevelData.GRAVITY,LevelData.FLOOR,b.x+95).value==LevelData.UP,
+                    "Upper path entry missing");
+            require(item(lvl,LevelData.GRAVITY,LevelData.CEILING,b.x+705).value==LevelData.DOWN,
+                    "Upper path rejoin missing");
+            require(item(lvl,LevelData.POINT,LevelData.FLOOR,b.x+475).value==b.lower,
+                    "Lower branch reward wrong");
+            require(item(lvl,LevelData.POINT,LevelData.CEILING,b.x+485).value==b.upper,
+                    "Upper branch reward wrong");
+            require(item(lvl,LevelData.POINT,LevelData.FLOOR,b.x+992).value==1,
+                    "Branch reunion reward missing");
+            require(lvl.checkpoints.stream().anyMatch(x->near(x,b.x+915)),
+                    "Branch checkpoint missing");
+            if(b.gated) {
+                int floorColor=item(lvl,LevelData.COLOR,LevelData.FLOOR,b.x+310).value;
+                int roofColor=item(lvl,LevelData.COLOR,LevelData.CEILING,b.x+390).value;
+                require(gate(lvl,LevelData.FLOOR,b.x+610).color==floorColor,
+                        "Lower route gate has no matching item");
+                require(gate(lvl,LevelData.CEILING,b.x+610).color==roofColor,
+                        "Upper route gate has no matching item");
             }
-            for(int delta:new int[]{-1,1}) {
-                int newPos=state.pos+delta;
-                if(newPos<0||newPos>=nodes.size())continue;
-                Node here=nodes.get(state.pos),there=nodes.get(newPos);
-                // A colored gate applies to both directions and cannot be crossed
-                // without its matching color, except on a different track.
-                LevelData.Gate gate=there.gate!=null?there.gate:here.gate;
-                if(gate!=null&&gate.blocks(state.color,state.gravity))continue;
-                int c=state.color,g=state.gravity;
-                if(there.item!=null&&there.item.lane==g) {
-                    if(there.item.type==LevelData.COLOR_ITEM)c=there.item.value;
-                    if(there.item.type==LevelData.GRAVITY_ITEM)g=there.item.value;
-                }
-                queue.add(new State(newPos,c,g,state.back||delta<0));
+            if(b.challenging){
+                require(lvl.gaps.stream().anyMatch(g->near(g.from,b.x+548)),
+                        "Expected small jump gap");
+                require(lvl.ledges.stream().anyMatch(g->near(g.from,b.x+496)),
+                        "Optional ledge missing");
+                require(item(lvl,LevelData.POINT,LevelData.MID,b.x+605).value==5,
+                        "Optional skill reward missing");
+                require(lvl.spikes.stream().anyMatch(h->near(h.x,b.x+778)),
+                        "Expected mild spike hazard");
             }
         }
-        if(!found)throw new AssertionError("No route for "+(index+1)+" "+level.title);
-        if(index>=4 && foundWithoutBacktrack)throw new AssertionError("Backtracking is not required in "+level.title);
-        if(index>=4 && !foundWithBacktrack)throw new AssertionError("Missing backtrack route: "+level.title);
-        System.out.println("Level "+(index+1)+": "+level.title+" / reachable; explored "+iterations+" states");
     }
+    private static void scoreRoutes(LevelData.Level lvl,int number) {
+        List<LevelData.Branch> branches=lvl.branches;
+        if(branches.isEmpty()){
+            require(lvl.availablePoints()>=lvl.target,"Intro route cannot score enough");
+            System.out.println("Level "+number+": "+lvl.name+" | intro score "
+                    +lvl.availablePoints()+"/"+lvl.target);
+            return;
+        }
+        int paths=1<<branches.size(),feasible=0,min=Integer.MAX_VALUE,max=0;
+        for(int mask=0;mask<paths;mask++){
+            // One starting +1 and one reunion +1 per branch.
+            int points=1+branches.size();
+            for(int b=0;b<branches.size();b++){
+                LevelData.Branch branch=branches.get(b);
+                points+=((mask&(1<<b))!=0)?branch.upper:branch.lower;
+            }
+            min=Math.min(min,points);max=Math.max(max,points);
+            if(points>=lvl.target)feasible++;
+        }
+        require(max>=lvl.target,
+                "Level "+number+": threshold unreachable without optional risky tokens: max="+max);
+        require(min<lvl.target,
+                "Level "+number+": point choices are inconsequential: min="+min);
+        if(number>=5)require(feasible>=2,
+                "Level "+number+": multiple viable point routes required");
+        System.out.println("Level "+number+": "+lvl.name
+                +" | "+feasible+"/"+paths+" simple routes open exit"
+                +" | score "+min+".."+max+" / "+lvl.target
+                +" | optional tokens: "+(lvl.availablePoints()-1-branches.size()*16));
+    }
+
     public static void main(String[] args) {
-        if(LevelData.LEVELS.size()!=10)throw new AssertionError("Expected 10 levels");
-        for(int i=0;i<LevelData.LEVELS.size();i++)check(LevelData.LEVELS.get(i),i);
-        System.out.println("Ten curated levels pass symbolic state/path checks.");
+        require(LevelData.LEVELS.size()==10,"Expected 10 curated levels");
+        float prev=0;int previousBranches=-1;
+        for(int i=0;i<LevelData.LEVELS.size();i++) {
+            LevelData.Level lvl=LevelData.LEVELS.get(i);
+            require(lvl.finish>prev,"Levels must grow steadily in horizontal length");
+            require(lvl.branches.size()>=previousBranches,"Branch count must not decrease");
+            structural(lvl,i+1);
+            scoreRoutes(lvl,i+1);
+            prev=lvl.finish;previousBranches=lvl.branches.size();
+        }
+        System.out.println("All ten levels pass geometry and score-route design checks.");
     }
 }
