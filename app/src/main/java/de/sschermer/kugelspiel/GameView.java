@@ -22,7 +22,9 @@ final class GameView extends View {
     private final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
     private final BounceChain bounce=new BounceChain();
     private final HashSet<Integer> left=new HashSet<>(),right=new HashSet<>(),jump=new HashSet<>();
+    private final HalfScreenControls halfControls=new HalfScreenControls();
     private final android.content.SharedPreferences prefs;
+    private boolean touchHalves=false,menuOpen=false;
     private float x,y,vx,vy,camX,camY,scale=1,lastDt=0;
     private float jumpBuffer,coyote,tipTime,messageTime,exitWarning,finishDelay,resetHold;
     private float checkpointX,checkpointY;
@@ -40,6 +42,7 @@ final class GameView extends View {
     GameView(Context context) {
         super(context);
         prefs=context.getSharedPreferences("kugelspiel_progress",Context.MODE_PRIVATE);
+        touchHalves=prefs.getBoolean("touch_halves",false);
         level=Math.max(0,Math.min(9,prefs.getInt("level_008",0)));
         begin(false);
         setFocusable(true);
@@ -47,7 +50,7 @@ final class GameView extends View {
     private LevelData.Level world(){return LevelData.LEVELS.get(level);}
     void setPaused(boolean pause) {
         paused=pause;last=System.nanoTime();
-        if(pause){left.clear();right.clear();jump.clear();resetHold=0;}
+        if(pause){clearControls();resetHold=0;}
     }
     private void begin(boolean first) {
         if(first)level=0;
@@ -60,7 +63,7 @@ final class GameView extends View {
         surface=true;complete=false;finishDelay=0;resetHold=0;jumpBuffer=0;coyote=.14f;
         tipTime=4.5f;messageTime=0;exitWarning=0;
         camX=0;camY=0;
-        left.clear();right.clear();jump.clear();
+        clearControls();
         prefs.edit().putInt("level_008",level).apply();
     }
     private void msg(String t) {message=t;messageTime=1.65f;}
@@ -179,12 +182,12 @@ final class GameView extends View {
     }
 
     private void tick(float dt) {
-        if(paused||complete)return;
+        if(paused||complete||menuOpen)return;
         if(finishDelay>0){finishDelay-=dt;if(finishDelay<=0)next();return;}
         tipTime=Math.max(0,tipTime-dt);
         messageTime=Math.max(0,messageTime-dt);
         exitWarning=Math.max(0,exitWarning-dt);
-        if(!left.isEmpty()&&!right.isEmpty()){
+        if(!touchHalves&&!left.isEmpty()&&!right.isEmpty()){
             resetHold+=dt;
             if(resetHold>=2.5f){begin(false);msg("Level neu gestartet");return;}
         }else resetHold=0;
@@ -293,6 +296,7 @@ final class GameView extends View {
         ball(c);
         c.restore();
         headsUp(c,vw,vh);
+        if(menuOpen)drawControlsMenu(c,vw,vh);
         c.restore();
         postInvalidateOnAnimation();
     }
@@ -578,13 +582,21 @@ final class GameView extends View {
             c.drawText(messageTime>0?message:world().name,vw/2,116,p);
             p.setTextAlign(Paint.Align.LEFT);
         }
-        button(c,105,vh-104,70,1,!left.isEmpty());
-        button(c,268,vh-104,70,2,!right.isEmpty());
-        button(c,vw-107,vh-108,78,3,!jump.isEmpty());
+        if(!touchHalves){
+            button(c,105,vh-104,70,1,!left.isEmpty());
+            button(c,268,vh-104,70,2,!right.isEmpty());
+            button(c,vw-107,vh-108,78,3,!jump.isEmpty());
+        }
+        p.setColor(0xb9143544);
+        c.drawRoundRect(new RectF(vw*.5f-82,vh-142,vw*.5f+82,vh-70),15,15,p);
+        p.setTypeface(Typeface.DEFAULT_BOLD);
+        p.setTextAlign(Paint.Align.CENTER);p.setTextSize(21);p.setColor(0xffe6fffa);
+        c.drawText("MENÜ",vw*.5f,vh-96,p);
+        p.setTextAlign(Paint.Align.LEFT);
         p.setTextSize(15);p.setColor(0xffbdd5df);
         c.drawText("FARBE "+colorName(color)+"  |  GRAVITATION "+(gravity==LevelData.UP?"↑":"↓"),26,vh-16,p);
         p.setTextAlign(Paint.Align.RIGHT);
-        c.drawText("← + → halten: Neustart",vw-26,vh-16,p);
+        c.drawText(touchHalves?"Neustart im Menü":"← + → halten: Neustart",vw-26,vh-16,p);
         p.setTextAlign(Paint.Align.LEFT);
         if(complete) {
             p.setColor(0xe20b2632);
@@ -611,6 +623,63 @@ final class GameView extends View {
         }
         t.close();p.setColor(0xffffffff);c.drawPath(t,p);
     }
+    private void clearControls(){
+        left.clear();right.clear();jump.clear();
+        halfControls.reset();
+        resetHold=0;
+    }
+    private void requestJump(){
+        if(complete)begin(true);
+        else jumpBuffer=.16f;
+    }
+    private boolean menuHit(float rawX,float rawY){
+        float xx=rawX/scale,yy=rawY/scale,vw=getWidth()/scale,vh=getHeight()/scale;
+        return xx>=vw*.5f-90&&xx<=vw*.5f+90&&yy>=vh-150&&yy<=vh-60;
+    }
+    private void selectTouchMode(boolean enable){
+        touchHalves=enable;
+        prefs.edit().putBoolean("touch_halves",enable).apply();
+        clearControls();
+    }
+    private void menuOption(Canvas c,float vw,float vh,float top,float bottom,String label,boolean selected){
+        float x1=vw*.30f,x2=vw*.70f,y1=vh*top,y2=vh*bottom;
+        p.setColor(selected?0xff236357:0xff284352);
+        c.drawRoundRect(new RectF(x1,y1,x2,y2),13,13,p);
+        p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(selected?3f:1.5f);
+        p.setColor(selected?0xff92ffe0:0xff678a96);
+        c.drawRoundRect(new RectF(x1,y1,x2,y2),13,13,p);
+        p.setStyle(Paint.Style.FILL);p.setTextAlign(Paint.Align.CENTER);
+        p.setTypeface(Typeface.DEFAULT_BOLD);p.setTextSize(22);p.setColor(0xfff2fffd);
+        c.drawText(label,vw*.5f,(y1+y2)*.5f+8,p);
+    }
+    private void drawControlsMenu(Canvas c,float vw,float vh){
+        p.setColor(0xd7081620);c.drawRect(0,0,vw,vh,p);
+        p.setColor(0xff112b39);
+        c.drawRoundRect(new RectF(vw*.26f,vh*.16f,vw*.74f,vh*.86f),24,24,p);
+        p.setTextAlign(Paint.Align.CENTER);p.setTypeface(Typeface.DEFAULT_BOLD);
+        p.setTextSize(31);p.setColor(0xffd5fff4);
+        c.drawText("STEUERUNG",vw*.5f,vh*.265f,p);
+        p.setTypeface(Typeface.DEFAULT);p.setTextSize(17);p.setColor(0xffadcbd1);
+        c.drawText("Steuerungsart auswählen",vw*.5f,vh*.315f,p);
+        menuOption(c,vw,vh,.35f,.45f,"DREI TASTEN"+(touchHalves?"":"  ✓"),!touchHalves);
+        menuOption(c,vw,vh,.48f,.58f,"ZWEI HÄLFTEN"+(touchHalves?"  ✓":""),touchHalves);
+        menuOption(c,vw,vh,.62f,.70f,"LEVEL NEU STARTEN",false);
+        menuOption(c,vw,vh,.73f,.82f,"WEITERSPIELEN",false);
+    }
+    private void handleMenuTap(float rawX,float rawY){
+        float xx=rawX/scale,yy=rawY/scale,vw=getWidth()/scale,vh=getHeight()/scale;
+        if(xx<vw*.30f||xx>vw*.70f)return;
+        if(yy>=vh*.35f&&yy<=vh*.45f)selectTouchMode(false);
+        else if(yy>=vh*.48f&&yy<=vh*.58f)selectTouchMode(true);
+        else if(yy>=vh*.62f&&yy<=vh*.70f){menuOpen=false;begin(false);}
+        else if(yy>=vh*.73f&&yy<=vh*.82f){menuOpen=false;clearControls();}
+    }
+    private void syncHalfMovement(){
+        left.clear();right.clear();jump.clear();
+        int direction=halfControls.direction();
+        if(direction==HalfScreenControls.LEFT)left.add(0);
+        else if(direction==HalfScreenControls.RIGHT)right.add(0);
+    }
     private int control(float rawX,float rawY){
         float xx=rawX/scale,yy=rawY/scale,vw=getWidth()/scale,vh=getHeight()/scale;
         if(Math.hypot(xx-105,yy-(vh-104))<90)return 1;
@@ -625,23 +694,45 @@ final class GameView extends View {
         if(type==2)right.add(pointer);
         if(type==3){
             jump.add(pointer);
-            if(!previous){
-                if(complete)begin(true);
-                else jumpBuffer=.16f;
-            }
+            if(!previous)requestJump();
         }
     }
     @Override public boolean onTouchEvent(MotionEvent e){
         int action=e.getActionMasked(),idx=e.getActionIndex();
-        if(action==MotionEvent.ACTION_DOWN||action==MotionEvent.ACTION_POINTER_DOWN){
-            assign(e.getPointerId(idx),control(e.getX(idx),e.getY(idx)));
-        }else if(action==MotionEvent.ACTION_MOVE){
-            for(int i=0;i<e.getPointerCount();i++)
-                assign(e.getPointerId(i),control(e.getX(i),e.getY(i)));
-        }else if(action==MotionEvent.ACTION_POINTER_UP||action==MotionEvent.ACTION_UP){
-            assign(e.getPointerId(idx),0);
-        }else if(action==MotionEvent.ACTION_CANCEL){
-            left.clear();right.clear();jump.clear();resetHold=0;
+        if(menuOpen){
+            if(action==MotionEvent.ACTION_UP)handleMenuTap(e.getX(idx),e.getY(idx));
+            return true;
+        }
+        if((action==MotionEvent.ACTION_DOWN||action==MotionEvent.ACTION_POINTER_DOWN)
+                &&menuHit(e.getX(idx),e.getY(idx))){
+            menuOpen=true;clearControls();return true;
+        }
+        if(touchHalves){
+            if(action==MotionEvent.ACTION_DOWN||action==MotionEvent.ACTION_POINTER_DOWN){
+                int side=e.getX(idx)<getWidth()*.5f?HalfScreenControls.LEFT:HalfScreenControls.RIGHT;
+                if(halfControls.press(e.getPointerId(idx),side,e.getEventTime()))requestJump();
+            }else if(action==MotionEvent.ACTION_MOVE){
+                for(int i=0;i<e.getPointerCount();i++){
+                    int side=e.getX(i)<getWidth()*.5f?HalfScreenControls.LEFT:HalfScreenControls.RIGHT;
+                    halfControls.move(e.getPointerId(i),side);
+                }
+            }else if(action==MotionEvent.ACTION_POINTER_UP||action==MotionEvent.ACTION_UP){
+                halfControls.release(e.getPointerId(idx),e.getEventTime());
+            }else if(action==MotionEvent.ACTION_CANCEL){
+                clearControls();
+            }
+            syncHalfMovement();
+        }else{
+            if(action==MotionEvent.ACTION_DOWN||action==MotionEvent.ACTION_POINTER_DOWN){
+                assign(e.getPointerId(idx),control(e.getX(idx),e.getY(idx)));
+            }else if(action==MotionEvent.ACTION_MOVE){
+                for(int i=0;i<e.getPointerCount();i++)
+                    assign(e.getPointerId(i),control(e.getX(i),e.getY(i)));
+            }else if(action==MotionEvent.ACTION_POINTER_UP||action==MotionEvent.ACTION_UP){
+                assign(e.getPointerId(idx),0);
+            }else if(action==MotionEvent.ACTION_CANCEL){
+                clearControls();
+            }
         }
         return true;
     }

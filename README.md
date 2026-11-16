@@ -1,6 +1,16 @@
 # ORBIFLUX
 
-Eigenständiger nativer Android-2D-Puzzle-Platformer, **Iteration 009 / Version 0.9.0**.
+Eigenständiger nativer Android-2D-Puzzle-Platformer, **Iteration 010 / Version 0.10.0**.
+
+## Steuerung ab Version 0.10.0
+
+Über die unten mittig eingeblendete Schaltfläche **MENÜ** lässt sich jederzeit zwischen **DREI TASTEN** und **ZWEI HÄLFTEN** wählen. Die Auswahl bleibt beim nächsten App-Start erhalten. Die klassische Steuerung bleibt zunächst die Standardeinstellung.
+
+- **Drei Tasten:** bisherige Steuerung für links, rechts und springen; beide Richtungstasten 2,5 Sekunden halten setzt den Level zurück.
+- **Zwei Hälften:** Die drei Steuerungstasten sind vollständig ausgeblendet. Die erste Berührung der linken bzw. rechten Bildschirmhälfte bewegt die Kugel in die entsprechende Richtung. Ein zweiter Finger auf der anderen Hälfte löst genau einen Sprung aus, ohne die Bewegungsrichtung des ersten Fingers zu verändern. Nach dem Loslassen des zweiten Fingers kann ein erneutes Aufsetzen wieder springen. Ebenfalls springt die Kugel beim Loslassen und erneuten Berühren derselben Hälfte innerhalb von 260 ms. Ein Richtungswechsel durch Wischen allein löst keinen Sprung aus.
+- **Menü:** Das Spiel pausiert während der Auswahl; der Level kann hier auch neu gestartet werden. Die Funktionalität der Sprungketten und ihre Physik bleiben erhalten. Das Einstellungsmenü ist die einzige eingeblendete Schaltfläche im Zwei-Hälften-Modus.
+
+Die berührungsbasierte Steuerlogik wird mit einem zusätzlichen reinen Java-Test geprüft. Ein realer Test der Bedienung auf unterschiedlichen Android-Geräten bleibt zusätzlich erforderlich.
 
 ## Produktregeln
 
@@ -41,11 +51,11 @@ GitHub Actions verwendet Java 17, Gradle 8.10.2 und Android SDK 35. Vor dem Andr
 
 **Grenze dieser Tests:** Es gibt noch keinen vollständigen physikbasierten Spiel-Durchlauf. Insbesondere schwierige Wege zu allen Marken, das Timing der Helium-Apparaturen und mögliche Sackgassen müssen am Android-Gerät geprüft und gegebenenfalls korrigiert werden. Die Strukturprüfung ist keine Garantie, dass jeder Level tatsächlich komplett lösbar ist.
 
-Debug-Build per GitHub Actions und nach erfolgreichem Workflow als direkte Datei unter GitHub Releases (Vorabversion `v0.9.0-preview`).
+Debug-Build per GitHub Actions und nach erfolgreichem Workflow als direkte Datei unter GitHub Releases (Vorabversion `v0.10.0-preview`).
 
 ## Technische und rechtliche Angaben
 
-Der vorläufige App-Name lautet **ORBIFLUX** (Markenprüfung vor Veröffentlichung erforderlich). Das Chrome-Türkis-Launcher-Icon bleibt ohne Schrift. Die App-ID ist weiterhin `de.sschermer.kugelspiel`, `versionCode 9`. Für den Test dieser umfassend geänderten Karten startet ein eigener Level-Fortschritt unter `level_008`; ältere gespeicherte Fortschrittsdaten bleiben unabhängig davon im App-Speicher erhalten.
+Der vorläufige App-Name lautet **ORBIFLUX** (Markenprüfung vor Veröffentlichung erforderlich). Das Chrome-Türkis-Launcher-Icon bleibt ohne Schrift. Die App-ID ist weiterhin `de.sschermer.kugelspiel`, `versionCode 10`. Für den Test dieser umfassend geänderten Karten startet ein eigener Level-Fortschritt unter `level_008`; ältere gespeicherte Fortschrittsdaten bleiben unabhängig davon im App-Speicher erhalten.
 
 Alle Spielgrafiken sind selbst mit Android Canvas gezeichnet. Das Launcher-Icon ist ein eigens für dieses Projekt generiertes Chrom-Türkis-Motiv und als WebP eingebunden; Herkunft siehe `THIRD_PARTY_NOTICES.md`. Es wurden keine unklar lizenzierten Fremdassets oder Audiodateien übernommen. Die Rechte am eigenen Code und an der Grafik bleiben bis zur ausdrücklichen Lizenzentscheidung vorbehalten. Ein öffentliches GitHub-Repository ist nicht automatisch Open Source. Weitere Angaben: `THIRD_PARTY_NOTICES.md`.
 
