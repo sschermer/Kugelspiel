@@ -55,7 +55,7 @@ final class GameView extends View {
     }
     private void next() {
         if(level==LevelData.LEVELS.size()-1) {
-            complete=true;finishTime=0; action="Alle zehn Raetsel geloest!";
+            complete=true;finishTime=0; action="Alle zehn Rätsel gelöst!";
         } else {
             level++;reset(false);
         }
@@ -117,7 +117,7 @@ final class GameView extends View {
         }
         // Repeated items are not consumed; touching them again resets the state.
         if(x>=world().finish-7) {
-            finishTime=.75f;status("Raetsel geloest");
+            finishTime=.75f;status("Rätsel gelöst");
             vx=0;vy=0;
         }
     }
@@ -319,7 +319,7 @@ final class GameView extends View {
             p.setColor(0xd5112c37);c.drawRoundRect(new RectF(ww*.16f,hh*.27f,ww*.84f,hh*.66f),20,20,p);
             p.setTextAlign(Paint.Align.CENTER);p.setColor(0xffbdf5db);
             p.setTypeface(Typeface.DEFAULT_BOLD);p.setTextSize(35);
-            c.drawText("ALLE ZEHN RAETSEL GELOEST",ww*.5f,hh*.43f,p);
+            c.drawText("ALLE ZEHN RÄTSEL GELÖST",ww*.5f,hh*.43f,p);
             p.setTextSize(21);p.setColor(0xfff2ffff);
             c.drawText("Zum Neustart auf SPRINGEN tippen",ww*.5f,hh*.53f,p);
             p.setTextAlign(Paint.Align.LEFT);
