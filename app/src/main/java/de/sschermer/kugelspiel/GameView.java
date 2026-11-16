@@ -18,7 +18,7 @@ import java.util.Locale;
 /** Native Canvas renderer and platform physics for layered tile mazes. */
 final class GameView extends View {
     private static final float TILE=LevelData.TILE, R=15f, G=950f;
-    private static final float JUMP=490f, SPEED=266f, STEP=1f/120f, HOP=157f;
+    private static final float JUMP=490f, SPEED=532f, STEP=1f/120f, HOP=157f;
     private final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
     private final BounceChain bounce=new BounceChain();
     private final HashSet<Integer> left=new HashSet<>(),right=new HashSet<>(),jump=new HashSet<>();
@@ -192,6 +192,7 @@ final class GameView extends View {
             if(resetHold>=2.5f){begin(false);msg("Level neu gestartet");return;}
         }else resetHold=0;
 
+        if(touchHalves)syncHalfMovement(android.os.SystemClock.uptimeMillis());
         int command=(right.isEmpty()?0:1)-(left.isEmpty()?0:1);
         if(command!=0)vx+=command*(surface?1320f:860f)*dt;
         else vx*=Math.max(0,1-(surface?10f:3f)*dt);
@@ -674,9 +675,9 @@ final class GameView extends View {
         else if(yy>=vh*.62f&&yy<=vh*.70f){menuOpen=false;begin(false);}
         else if(yy>=vh*.73f&&yy<=vh*.82f){menuOpen=false;clearControls();}
     }
-    private void syncHalfMovement(){
+    private void syncHalfMovement(long now){
         left.clear();right.clear();jump.clear();
-        int direction=halfControls.direction();
+        int direction=halfControls.direction(now);
         if(direction==HalfScreenControls.LEFT)left.add(0);
         else if(direction==HalfScreenControls.RIGHT)right.add(0);
     }
@@ -710,7 +711,7 @@ final class GameView extends View {
         if(touchHalves){
             if(action==MotionEvent.ACTION_DOWN||action==MotionEvent.ACTION_POINTER_DOWN){
                 int side=e.getX(idx)<getWidth()*.5f?HalfScreenControls.LEFT:HalfScreenControls.RIGHT;
-                if(halfControls.press(e.getPointerId(idx),side,e.getEventTime()))requestJump();
+                if(halfControls.press(e.getPointerId(idx),side,e.getEventTime(),surface&&Math.abs(vx)<8f))requestJump();
             }else if(action==MotionEvent.ACTION_MOVE){
                 for(int i=0;i<e.getPointerCount();i++){
                     int side=e.getX(i)<getWidth()*.5f?HalfScreenControls.LEFT:HalfScreenControls.RIGHT;
@@ -721,7 +722,7 @@ final class GameView extends View {
             }else if(action==MotionEvent.ACTION_CANCEL){
                 clearControls();
             }
-            syncHalfMovement();
+            syncHalfMovement(e.getEventTime());
         }else{
             if(action==MotionEvent.ACTION_DOWN||action==MotionEvent.ACTION_POINTER_DOWN){
                 assign(e.getPointerId(idx),control(e.getX(idx),e.getY(idx)));
