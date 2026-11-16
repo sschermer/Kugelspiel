@@ -29,7 +29,7 @@ jobs:
           java -Djava.awt.headless=true -cp /tmp/kugelspiel-check de.sschermer.kugelspiel.LevelPreview /tmp/kugelspiel-previews
       - uses: actions/upload-artifact@v4
         with:
-          name: kugelspiel-iteration-008-level-overviews
+          name: orbiflux-iteration-009-level-overviews
           path: /tmp/kugelspiel-previews/level_*.png
           if-no-files-found: error
       - name: Install Android SDK platform
@@ -42,7 +42,7 @@ jobs:
         run: gradle --no-daemon assembleDebug
       - uses: actions/upload-artifact@v4
         with:
-          name: kugelspiel-iteration-008-debug
+          name: orbiflux-iteration-009-debug
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
       - name: Publish direct-download preview APK on GitHub Releases
@@ -53,12 +53,12 @@ jobs:
           VERSION=$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts | head -n 1)
           test -n "$VERSION"
           TAG="v${VERSION}-preview"
-          APK="Kugelspiel-${VERSION}-debug.apk"
+          APK="ORBIFLUX-${VERSION}-debug.apk"
           cp app/build/outputs/apk/debug/app-debug.apk "$APK"
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" --clobber
           else
             gh release create "$TAG" "$APK" --target "$GITHUB_SHA" --prerelease \
-              --title "Kugelspiel ${VERSION} - Android Test-APK" \
+              --title "ORBIFLUX ${VERSION} - Android Test-APK" \
               --notes "Vorschau zur privaten Erprobung. Debug-signierte APK; der Signierschlüssel wechselt zwischen CI-Builds. Deshalb ist möglicherweise die Deinstallation der älteren APK nötig; dabei können lokale Spielstände verloren gehen. Kein finaler App-Release."
           fi
