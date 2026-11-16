@@ -7,8 +7,8 @@ android {
     applicationId = "de.sschermer.kugelspiel"
     minSdk = 24
     targetSdk = 35
-    versionCode = 15
-    versionName = "0.15.0"
+    versionCode = 16
+    versionName = "0.16.0"
  }
  compileOptions {
     sourceCompatibility = JavaVersion.VERSION_17

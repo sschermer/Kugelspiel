@@ -1,6 +1,22 @@
 # ORBIFLUX
 
-Eigenständiger nativer Android-2D-Puzzle-Platformer, **Iteration 015 / Version 0.15.0**.
+Eigenständiger nativer Android-2D-Puzzle-Platformer, **Iteration 016 / Version 0.16.0**.
+
+## Iteration 016: Unbedingtes 200-ms-Startfenster und sichtbare Touch-Diagnose
+
+Der Gerätetest ergab weiterhin unmittelbare seitliche Bewegung statt des vorgesehenen senkrechten Sprungs aus dem Stand. Die bisherigen Reparaturen waren unzuverlässig, weil die Entscheidung für die Startverzögerung von der internen Bodenkontakt- bzw. Geschwindigkeitsmessung abhängig war.
+
+**Neue verbindliche Implementierung:** Sobald in der Zwei-Hälften-Steuerung der Bildschirm von **null auf einen Finger** wechselt, beginnt **immer** ein 200-ms-Startfenster. Diese Sperre kann weder durch `surface` noch durch `vx` oder `vy` übersprungen werden. Der erste Finger setzt den horizontalen Impuls zurück; während des Fensters bleibt horizontale Bewegung gesperrt. Trifft der zweite Finger innerhalb von einschließlich 200 ms auf der gegenüberliegenden Hälfte ein, wird eine senkrechte Sprungbewegung ausgelöst. Solange beide Finger liegen bleiben, bleibt die horizontale Bewegung vollständig gesperrt.
+
+**Nach dem senkrechten Sprung:** Wird einer der beiden Finger losgelassen, beginnt ein weiteres, eigenständiges 200-ms-Fenster. Erst danach beschleunigt die Kugel in Richtung des verbleibenden Fingers, gegebenenfalls in der Luft.
+
+**Bewegungssprung:** Kommt der zweite Finger später als 200 ms nach dem ersten Kontakt hinzu, springt die Kugel bei unverminderter seitlicher Geschwindigkeit und weiterhin wirkender Bewegungsbeschleunigung. Für diesen Sprung gibt es auch beim Loslassen des zweiten Fingers keine Wartezeit.
+
+**Diagnose für den Handytest:** In Debug-Builds wird im Zwei-Hälften-Modus nahe der oberen Bildschirmkante ein kleiner Hinweis mit Fingerzahl und erkanntem Modus angezeigt: `ANLAUFSPERRE`, `SENKRECHT`, `FREIGABE` oder `BEWEGUNGSSPRUNG`. Damit lassen sich aus der tatsächlichen Touch-Folge auf dem Gerät konkrete Fehler lokalisieren. Die Anzeige ist eine funktionale Testhilfe, keine dauerhafte Spielgrafik; Release-Builds zeigen sie nicht.
+
+Der bewusst eingegangene Kompromiss ist, dass auch ein neuer erster Finger während einer bereits laufenden Ballbewegung zunächst eine 200-ms-Bewegungssperre auslöst. Das verhindert nach mehreren fehlgeschlagenen Gerätests eine unbemerkte Umgehung des senkrechten Startsprungs. Die genauen Gesten können nach dem Praxistest weiter verfeinert werden.
+
+Die reinen Java-Tests simulieren Fingerkontakte an den Zeitgrenzen, unterschiedlich lange Zwei-Finger-Haltephasen, die 200-ms-Freigabe und ungebremste Bewegungssprünge. Die App-ID bleibt unverändert.
 
 ## Iteration 015: Stillstandserkennung für senkrechten Startsprung korrigiert
 
@@ -89,11 +105,11 @@ GitHub Actions verwendet Java 17, Gradle 8.10.2 und Android SDK 35. Vor dem Andr
 
 **Grenze dieser Tests:** Es gibt noch keinen vollständigen physikbasierten Spiel-Durchlauf. Insbesondere schwierige Wege zu allen Marken, das Timing der Helium-Apparaturen und mögliche Sackgassen müssen am Android-Gerät geprüft und gegebenenfalls korrigiert werden. Die Strukturprüfung ist keine Garantie, dass jeder Level tatsächlich komplett lösbar ist.
 
-Debug-Build per GitHub Actions und nach erfolgreichem Workflow als direkte Datei unter GitHub Releases (Vorabversion `v0.15.0-preview`).
+Debug-Build per GitHub Actions und nach erfolgreichem Workflow als direkte Datei unter GitHub Releases (Vorabversion `v0.16.0-preview`).
 
 ## Technische und rechtliche Angaben
 
-Der vorläufige App-Name lautet **ORBIFLUX** (Markenprüfung vor Veröffentlichung erforderlich). Das Chrome-Türkis-Launcher-Icon bleibt ohne Schrift. Die App-ID ist weiterhin `de.sschermer.kugelspiel`, `versionCode 15`. Für den Test dieser umfassend geänderten Karten startet ein eigener Level-Fortschritt unter `level_008`; ältere gespeicherte Fortschrittsdaten bleiben unabhängig davon im App-Speicher erhalten.
+Der vorläufige App-Name lautet **ORBIFLUX** (Markenprüfung vor Veröffentlichung erforderlich). Das Chrome-Türkis-Launcher-Icon bleibt ohne Schrift. Die App-ID ist weiterhin `de.sschermer.kugelspiel`, `versionCode 16`. Für den Test dieser umfassend geänderten Karten startet ein eigener Level-Fortschritt unter `level_008`; ältere gespeicherte Fortschrittsdaten bleiben unabhängig davon im App-Speicher erhalten.
 
 Alle Spielgrafiken sind selbst mit Android Canvas gezeichnet. Das Launcher-Icon ist ein eigens für dieses Projekt generiertes Chrom-Türkis-Motiv und als WebP eingebunden; Herkunft siehe `THIRD_PARTY_NOTICES.md`. Es wurden keine unklar lizenzierten Fremdassets oder Audiodateien übernommen. Die Rechte am eigenen Code und an der Grafik bleiben bis zur ausdrücklichen Lizenzentscheidung vorbehalten. Ein öffentliches GitHub-Repository ist nicht automatisch Open Source. Weitere Angaben: `THIRD_PARTY_NOTICES.md`.
 

@@ -602,6 +602,16 @@ final class GameView extends View {
         p.setTextAlign(Paint.Align.RIGHT);
         c.drawText(touchHalves?"Neustart im Menü":"← + → halten: Neustart",vw-26,vh-16,p);
         p.setTextAlign(Paint.Align.LEFT);
+        // Functional diagnostics for this debug APK; removed from release builds.
+        if(touchHalves&&BuildConfig.DEBUG){
+            p.setTypeface(Typeface.DEFAULT_BOLD);
+            p.setTextAlign(Paint.Align.CENTER);
+            p.setTextSize(17);p.setColor(0xffb1fff1);
+            c.drawText("TOUCH-TEST: "+
+                    halfControls.debugStatus(android.os.SystemClock.uptimeMillis()),
+                    vw*.5f,147,p);
+            p.setTextAlign(Paint.Align.LEFT);
+        }
         if(complete) {
             p.setColor(0xe20b2632);
             c.drawRoundRect(new RectF(vw*.15f,vh*.26f,vw*.85f,vh*.66f),20,20,p);
@@ -714,16 +724,14 @@ final class GameView extends View {
         if(touchHalves){
             if(action==MotionEvent.ACTION_DOWN||action==MotionEvent.ACTION_POINTER_DOWN){
                 int side=e.getX(idx)<getWidth()*.5f?HalfScreenControls.LEFT:HalfScreenControls.RIGHT;
-                // Ground-contact can flicker for a frame while the marble appears
-                // stationary. Use its actual velocity instead of requiring surface.
-                boolean startingAtRest=HorizontalMotion.restingForInput(vx,vy);
-                if(action==MotionEvent.ACTION_DOWN&&startingAtRest){
+                // A first finger ALWAYS begins a 200ms recognition window.
+                // No physics flag (surface/vx/vy) is allowed to bypass it.
+                if(action==MotionEvent.ACTION_DOWN){
                     twoFingerTakeoffX=x;
-                    // Tiny residual velocity must not displace a stationary takeoff.
                     vx=0f;
                 }
                 boolean jumpNow=halfControls.press(e.getPointerId(idx),side,
-                        e.getEventTime(),startingAtRest);
+                        e.getEventTime());
                 if(jumpNow){
                     if(halfControls.isVerticalPair()){
                         // Keep the simultaneous start jump at its original takeoff x.
