@@ -59,7 +59,7 @@ final class LevelData {
         boolean solid(int col,int row){
             if(col<0||col>=columns||row<0)return true;
             if(row>=rows)return false;
-            return tiles[row][col]=='#';
+            return tiles[row][col]=='#' || tiles[row][col]=='X';
         }
         int pointsAvailable(){
             int sum=0;for(Item item:items)if(item.type==POINT)sum+=item.value;
@@ -206,6 +206,10 @@ final class LevelData {
             "Wähle deine Route und sammle genügend Punkte."
         };
         for(int index=0;index<10;index++){
+            // Levels 4-6 have intentionally hand-authored, non-template geometry.
+            if(index==3){result.add(HandcraftedLevels.caves());continue;}
+            if(index==4){result.add(HandcraftedLevels.tower());continue;}
+            if(index==5){result.add(HandcraftedLevels.twoWorlds());continue;}
             int height=stories[index];
             int target=(index<2?6:(height*7)+Math.max(0,height-2)*4);
             Builder b=new Builder(widths[index],height,target,names[index],tips[index]);
