@@ -1,6 +1,10 @@
 # ORBIFLUX
 
-Eigenständiger nativer Android-2D-Puzzle-Platformer, **Iteration 017 / Version 0.17.0**.
+Eigenständiger nativer Android-2D-Puzzle-Platformer, **Iteration 018 / Version 0.18.0**.
+
+## Iteration 018: Höchstgeschwindigkeit auf 75 % reduziert
+
+Die maximale horizontale Geschwindigkeit wurde von **532 auf 399 Welteinheiten/Sekunde** gesenkt (= 75 %). Beschleunigung, Reibung, Sprungkraft und die in Iteration 017 eingeführten zwei **100-ms-Verzögerungen** bleiben unverändert. Die funktionierende Zwei-Hälften-Gestenerkennung mit senkrechtem Startsprung und ungebremstem Bewegungssprung bleibt erhalten. Die Regressionstests verwenden ebenfalls 399 als neue Höchstgeschwindigkeit.
 
 ## Iteration 017: Beide Berührungsverzögerungen auf 100 ms reduziert
 
@@ -113,11 +117,11 @@ GitHub Actions verwendet Java 17, Gradle 8.10.2 und Android SDK 35. Vor dem Andr
 
 **Grenze dieser Tests:** Es gibt noch keinen vollständigen physikbasierten Spiel-Durchlauf. Insbesondere schwierige Wege zu allen Marken, das Timing der Helium-Apparaturen und mögliche Sackgassen müssen am Android-Gerät geprüft und gegebenenfalls korrigiert werden. Die Strukturprüfung ist keine Garantie, dass jeder Level tatsächlich komplett lösbar ist.
 
-Debug-Build per GitHub Actions und nach erfolgreichem Workflow als direkte Datei unter GitHub Releases (Vorabversion `v0.17.0-preview`).
+Debug-Build per GitHub Actions und nach erfolgreichem Workflow als direkte Datei unter GitHub Releases (Vorabversion `v0.18.0-preview`).
 
 ## Technische und rechtliche Angaben
 
-Der vorläufige App-Name lautet **ORBIFLUX** (Markenprüfung vor Veröffentlichung erforderlich). Das Chrome-Türkis-Launcher-Icon bleibt ohne Schrift. Die App-ID ist weiterhin `de.sschermer.kugelspiel`, `versionCode 17`. Für den Test dieser umfassend geänderten Karten startet ein eigener Level-Fortschritt unter `level_008`; ältere gespeicherte Fortschrittsdaten bleiben unabhängig davon im App-Speicher erhalten.
+Der vorläufige App-Name lautet **ORBIFLUX** (Markenprüfung vor Veröffentlichung erforderlich). Das Chrome-Türkis-Launcher-Icon bleibt ohne Schrift. Die App-ID ist weiterhin `de.sschermer.kugelspiel`, `versionCode 18`. Für den Test dieser umfassend geänderten Karten startet ein eigener Level-Fortschritt unter `level_008`; ältere gespeicherte Fortschrittsdaten bleiben unabhängig davon im App-Speicher erhalten.
 
 Alle Spielgrafiken sind selbst mit Android Canvas gezeichnet. Das Launcher-Icon ist ein eigens für dieses Projekt generiertes Chrom-Türkis-Motiv und als WebP eingebunden; Herkunft siehe `THIRD_PARTY_NOTICES.md`. Es wurden keine unklar lizenzierten Fremdassets oder Audiodateien übernommen. Die Rechte am eigenen Code und an der Grafik bleiben bis zur ausdrücklichen Lizenzentscheidung vorbehalten. Ein öffentliches GitHub-Repository ist nicht automatisch Open Source. Weitere Angaben: `THIRD_PARTY_NOTICES.md`.
 

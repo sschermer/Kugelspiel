@@ -18,7 +18,7 @@ import java.util.Locale;
 /** Native Canvas renderer and platform physics for layered tile mazes. */
 final class GameView extends View {
     private static final float TILE=LevelData.TILE, R=15f, G=950f;
-    private static final float JUMP=490f, SPEED=532f, STEP=1f/120f, HOP=157f;
+    private static final float JUMP=490f, SPEED=399f, STEP=1f/120f, HOP=157f;
     private final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
     private final BounceChain bounce=new BounceChain();
     private final HashSet<Integer> left=new HashSet<>(),right=new HashSet<>(),jump=new HashSet<>();

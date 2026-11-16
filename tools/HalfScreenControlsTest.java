@@ -13,7 +13,7 @@ public final class HalfScreenControlsTest {
         int command=side==HalfScreenControls.LEFT?-1:
                     side==HalfScreenControls.RIGHT?1:0;
         return HorizontalMotion.step(velocity,command,onSurface,
-                c.blocksHorizontal(now),1f/120f,532f);
+                c.blocksHorizontal(now),1f/120f,399f);
     }
     private static void freeze(HalfScreenControls c,long t,int frames,float initialVx,
                                 String message){
@@ -34,7 +34,7 @@ public final class HalfScreenControlsTest {
         check(c.pointerCount()==1,"one finger tracked");
         check(c.blocksHorizontal(1000),"first contact ALWAYS locked at t=0");
         check(c.blocksHorizontal(1099),"still locked at 99 ms");
-        freeze(c,1030,8,532f,"mandatory first-touch freeze");
+        freeze(c,1030,8,399f,"mandatory first-touch freeze");
         check(c.direction(1100)==HalfScreenControls.LEFT,"movement starts at 100ms");
         c.reset();
 
@@ -43,13 +43,13 @@ public final class HalfScreenControlsTest {
         check(c.press(3,HalfScreenControls.LEFT,2100),"opposite touch jumps");
         check(c.isVerticalPair(),"100ms is vertical even after start waiting");
         check(c.debugStatus(2250).contains("SENKRECHT"),"diagnosis shows vertical mode");
-        freeze(c,2300,480,532f,"vertical pair held four seconds");
+        freeze(c,2300,480,399f,"vertical pair held four seconds");
         c.release(2,6500);
         check(!c.isVerticalPair(),"one finger release ends vertical pair");
         check(c.blocksHorizontal(6599),"post-release 100ms delay at 99");
         close(step(c,6599,80f,false),0f,"release freeze cancels momentum");
         check(c.direction(6600)==HalfScreenControls.LEFT,"remaining left finger steers");
-        check(step(c,6600,0f,false)<0f,"left accelerates in midair after 200ms");
+        check(step(c,6600,0f,false)<0f,"left accelerates in midair after 100ms");
         c.reset();
 
         // Releasing the opposite finger also resumes the lead right direction.
@@ -57,7 +57,7 @@ public final class HalfScreenControlsTest {
         c.press(5,HalfScreenControls.LEFT,7010);
         c.release(5,7100);
         check(c.direction(7199)==0,"right release delay still active at 99ms");
-        check(c.direction(7200)==HalfScreenControls.RIGHT,"right acceleration after 200ms");
+        check(c.direction(7200)==HalfScreenControls.RIGHT,"right acceleration after 100ms");
         check(step(c,7200,0f,false)>0f,"right midair acceleration");
         c.reset();
 
@@ -71,17 +71,17 @@ public final class HalfScreenControlsTest {
 
         // 101ms is NOT vertical and must never slow a directional jump.
         c.press(8,HalfScreenControls.LEFT,9000);
-        check(!c.blocksHorizontal(9101),"start window ends after 200ms");
+        check(!c.blocksHorizontal(9101),"start window ends after 100ms");
         check(c.press(9,HalfScreenControls.RIGHT,9101),"late second finger jumps");
         check(!c.isVerticalPair(),"101ms is directional");
         check(c.direction(9101)==HalfScreenControls.LEFT,"lead left steering persists");
-        float vx=-420f;
+        float vx=-330f;
         for(int i=0;i<360;i++){
             float previous=vx;
             vx=step(c,9101+i*8L,vx,false);
             check(vx<=previous,"late finger must never brake left motion");
         }
-        close(vx,-532f,"left stays at max speed under second finger");
+        close(vx,-399f,"left stays at max speed under second finger");
         c.release(9,12100);
         check(c.direction(12100)==HalfScreenControls.LEFT,
                 "directional jump has no 100ms release delay");
@@ -92,7 +92,7 @@ public final class HalfScreenControlsTest {
         c.press(11,HalfScreenControls.LEFT,13400);
         check(!c.isVerticalPair(),"400ms pair is directional");
         check(c.direction(13400)==HalfScreenControls.RIGHT,"right steering maintained");
-        check(step(c,13400,430f,false)>430f,"right movement accelerates");
+        check(step(c,13400,340f,false)>340f,"right movement accelerates");
         c.reset();
 
         // Same side two touches never jump, and a dragged second pointer
