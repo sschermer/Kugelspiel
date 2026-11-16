@@ -64,19 +64,19 @@ final class LevelData {
 
     private static List<Level> build() {
         ArrayList<Level> result=new ArrayList<>();
-        result.add(new Builder("Die erste Farbe", "BLAU faerbt die Kugel. Blaues Metall geht durch blaue Tore.", 980)
+        result.add(new Builder("Die erste Farbe", "BLAU färbt die Kugel. Blaues Metall geht durch blaue Tore.", 980)
             .color(290,FLOOR,BLUE).gate(625,BOTH,BLUE).build());
-        result.add(new Builder("Zwei Schluessel", "Farbe bleibt, bis du ein anderes Farb-Item beruehrst.", 1290)
+        result.add(new Builder("Zwei Schlüssel", "Farbe bleibt, bis du ein anderes Farb-Item beruehrst.", 1290)
             .color(255,FLOOR,BLUE).gate(545,BOTH,BLUE)
             .color(780,FLOOR,AMBER).gate(1050,BOTH,AMBER).build());
         result.add(new Builder("Oben ist unten", "Pfeile setzen die Schwerkraft dauerhaft nach oben oder unten.", 1160)
             .grav(260,FLOOR,UP).color(540,CEILING,BLUE)
             .gate(845,BOTH,BLUE).build());
-        result.add(new Builder("Seitenwechsel", "Auf der Decke gelangst du an andere Gegenstaende.", 1540)
+        result.add(new Builder("Seitenwechsel", "Auf der Decke gelangst du an andere Gegenstände.", 1540)
             .grav(255,FLOOR,UP).color(540,CEILING,BLUE).gate(770,BOTH,BLUE)
             .grav(905,CEILING,DOWN).color(1100,FLOOR,AMBER)
             .gate(1335,BOTH,AMBER).build());
-        result.add(new Builder("Der Rueckweg", "Nicht jedes nuetzliche Item liegt in Laufrichtung.", 1460)
+        result.add(new Builder("Der Rückweg", "Nicht jedes nützliche Item liegt in Laufrichtung.", 1460)
             .color(280,FLOOR,AMBER).gate(595,FLOOR,AMBER)
             .grav(760,FLOOR,UP).color(360,CEILING,BLUE)
             .gate(1180,BOTH,BLUE).build());
@@ -88,7 +88,7 @@ final class LevelData {
             .grav(750,FLOOR,UP).color(370,CEILING,BLUE)
             .gate(1050,CEILING,BLUE).grav(1170,CEILING,DOWN)
             .color(1320,FLOOR,VIOLET).gate(1530,BOTH,VIOLET).build());
-        result.add(new Builder("Noch einmal zurueck", "Das Farb-Item auf dem Boden bleibt erreichbar.", 1630)
+        result.add(new Builder("Noch einmal zurück", "Das Farb-Item auf dem Boden bleibt erreichbar.", 1630)
             .grav(265,FLOOR,UP).color(525,CEILING,BLUE)
             .gate(790,CEILING,BLUE).grav(900,CEILING,DOWN)
             .color(605,FLOOR,AMBER).gate(1370,BOTH,AMBER).build());
@@ -97,7 +97,7 @@ final class LevelData {
             .grav(735,FLOOR,UP).color(370,CEILING,BLUE)
             .gate(1030,CEILING,BLUE).grav(1150,CEILING,DOWN)
             .color(860,FLOOR,VIOLET).gate(1510,BOTH,VIOLET).build());
-        result.add(new Builder("Die grosse Schleife", "Plane den Rueckweg zweimal. Nichts verschwindet.", 2050)
+        result.add(new Builder("Die große Schleife", "Plane den Rückweg zweimal. Nichts verschwindet.", 2050)
             .color(235,FLOOR,AMBER).gate(550,FLOOR,AMBER)
             .grav(675,FLOOR,UP).color(360,CEILING,BLUE)
             .gate(945,CEILING,BLUE).grav(1080,CEILING,DOWN)
