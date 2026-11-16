@@ -390,17 +390,16 @@ final class GameView extends View {
             c.drawText(item.value==LevelData.UP?"↑":"↓",xx,yy+17,paint);
             paint.setTextAlign(Paint.Align.LEFT);
         } else {
-            paint.setColor(used?0x44304151:0xbaffd36c);
+            // Single-award point token stays in the world after collection.
+            // Pending: opaque black with a white number.
+            // Collected: semi-transparent white with a black number.
+            paint.setColor(used?0x88ffffff:0xff07090c);
             c.drawCircle(xx,yy,35,paint);
-            paint.setColor(used?0xff39505c:0xff765119);c.drawCircle(xx,yy,29,paint);
-            paint.setColor(used?0xff7a919a:0xffffdc79);
-            paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(3.5f);
-            c.drawCircle(xx,yy,29,paint);paint.setStyle(Paint.Style.FILL);
-            paint.setColor(used?0xff899fa7:0xfffff9e7);
+            paint.setColor(used?0xff000000:0xffffffff);
             paint.setTypeface(Typeface.DEFAULT_BOLD);
             paint.setTextAlign(Paint.Align.CENTER);
-            paint.setTextSize(item.value==10?24:29);
-            c.drawText(used?"✓":"+"+item.value,xx,yy+10,paint);
+            paint.setTextSize(item.value==10?28:31);
+            c.drawText(Integer.toString(item.value),xx,yy+11,paint);
             paint.setTextAlign(Paint.Align.LEFT);
         }
     }
