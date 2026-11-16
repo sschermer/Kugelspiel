@@ -17,6 +17,11 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
+      - name: Check all ten puzzle routes
+        run: |
+          mkdir -p /tmp/kugelspiel-check
+          javac -encoding UTF-8 -d /tmp/kugelspiel-check app/src/main/java/de/sschermer/kugelspiel/LevelData.java tools/LevelRouteTest.java
+          java -cp /tmp/kugelspiel-check de.sschermer.kugelspiel.LevelRouteTest
       - name: Install Android SDK platform
         run: |
           SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | head -n 1)
@@ -27,6 +32,6 @@ jobs:
         run: gradle --no-daemon assembleDebug
       - uses: actions/upload-artifact@v4
         with:
-          name: kugelspiel-iteration-001-debug
+          name: kugelspiel-iteration-002-debug
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
