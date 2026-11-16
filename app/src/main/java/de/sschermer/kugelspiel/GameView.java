@@ -193,12 +193,13 @@ final class GameView extends View {
             if(resetHold>=2.5f){begin(false);msg("Level neu gestartet");return;}
         }else resetHold=0;
 
-        if(touchHalves)syncHalfMovement(android.os.SystemClock.uptimeMillis());
+        long inputTime=android.os.SystemClock.uptimeMillis();
+        if(touchHalves)syncHalfMovement(inputTime);
         int command=(right.isEmpty()?0:1)-(left.isEmpty()?0:1);
-        // Only a vertical-start pair and its 200 ms release delay lock movement.
+        // Share one monotonic timestamp for steering and the 200ms input gate.
         // A second finger added during running never cancels momentum.
         vx=HorizontalMotion.step(vx,command,surface,
-                touchHalves&&halfControls.blocksHorizontal(android.os.SystemClock.uptimeMillis()),dt,SPEED);
+                touchHalves&&halfControls.blocksHorizontal(inputTime),dt,SPEED);
         bounce.update(dt);
         jumpBuffer=Math.max(0,jumpBuffer-dt);
         if(surface&&!helium)coyote=.15f; else coyote=Math.max(0,coyote-dt);
@@ -713,7 +714,9 @@ final class GameView extends View {
         if(touchHalves){
             if(action==MotionEvent.ACTION_DOWN||action==MotionEvent.ACTION_POINTER_DOWN){
                 int side=e.getX(idx)<getWidth()*.5f?HalfScreenControls.LEFT:HalfScreenControls.RIGHT;
-                boolean startingAtRest=surface&&Math.abs(vx)<20f;
+                // Ground-contact can flicker for a frame while the marble appears
+                // stationary. Use its actual velocity instead of requiring surface.
+                boolean startingAtRest=HorizontalMotion.restingForInput(vx,vy);
                 if(action==MotionEvent.ACTION_DOWN&&startingAtRest){
                     twoFingerTakeoffX=x;
                     // Tiny residual velocity must not displace a stationary takeoff.

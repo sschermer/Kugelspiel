@@ -1,6 +1,14 @@
 # ORBIFLUX
 
-Eigenständiger nativer Android-2D-Puzzle-Platformer, **Iteration 014 / Version 0.14.0**.
+Eigenständiger nativer Android-2D-Puzzle-Platformer, **Iteration 015 / Version 0.15.0**.
+
+## Iteration 015: Stillstandserkennung für senkrechten Startsprung korrigiert
+
+Fehleranalyse von Version 0.14.0: Die Aktivierung der anfänglichen 200-ms-Eingabesperre war an die Bedingung `surface && abs(vx)<20` gekoppelt. Meldete die Kollisionsphysik kurz keinen direkten Bodenkontakt, obwohl die Kugel sichtbar beinahe ruhte, entfiel das gesamte Startzeitfenster. Eine einzelne Berührung löste sofort seitliche Beschleunigung aus.
+
+Jetzt wird der Stillstand anhand der tatsächlichen Geschwindigkeit erkannt: **horizontale Geschwindigkeit unter 45** und **vertikale Geschwindigkeit unter 90 Welteinheiten/Sekunde**. Die (gelegentlich flackernde) interne Bodenkontakt-Variable wird für diese Entscheidung nicht mehr benötigt. Sobald die erste Berührung bei nahezu ruhender Kugel beginnt, setzt die Logik die geringe Restgeschwindigkeit zurück und sperrt **200 ms lang jede horizontale Bewegung**. Ein zweiter Kontakt auf der gegenüberliegenden Hälfte innerhalb dieses Fensters löst einen senkrechten Sprung aus, der bei zwei gehaltenen Fingern keine Seitwärtsbewegung erlaubt. Die zweite **200-ms-Verzögerung nach Loslassen eines Fingers** bleibt erhalten. Ein zweiter Finger während bereits laufender Bewegung springt weiterhin ohne Abbremsen.
+
+Die Physikabfrage verwendet jetzt außerdem denselben monotonic-clock-Zeitstempel für Eingaberichtung und Bewegungsblockade, sodass an der 200-ms-Grenze kein inkonsistenter Zustand entstehen kann. Neue Regressionstests prüfen die Erkennung geringer Restbewegung ohne `surface`, eine volle 200-ms-Anlaufblockade und den anschließenden vertikalen Sprung ohne horizontalen Versatz.
 
 ## Iteration 014: Zwei getrennte Eingabeverzögerungen von jeweils 200 ms
 
@@ -81,11 +89,11 @@ GitHub Actions verwendet Java 17, Gradle 8.10.2 und Android SDK 35. Vor dem Andr
 
 **Grenze dieser Tests:** Es gibt noch keinen vollständigen physikbasierten Spiel-Durchlauf. Insbesondere schwierige Wege zu allen Marken, das Timing der Helium-Apparaturen und mögliche Sackgassen müssen am Android-Gerät geprüft und gegebenenfalls korrigiert werden. Die Strukturprüfung ist keine Garantie, dass jeder Level tatsächlich komplett lösbar ist.
 
-Debug-Build per GitHub Actions und nach erfolgreichem Workflow als direkte Datei unter GitHub Releases (Vorabversion `v0.14.0-preview`).
+Debug-Build per GitHub Actions und nach erfolgreichem Workflow als direkte Datei unter GitHub Releases (Vorabversion `v0.15.0-preview`).
 
 ## Technische und rechtliche Angaben
 
-Der vorläufige App-Name lautet **ORBIFLUX** (Markenprüfung vor Veröffentlichung erforderlich). Das Chrome-Türkis-Launcher-Icon bleibt ohne Schrift. Die App-ID ist weiterhin `de.sschermer.kugelspiel`, `versionCode 14`. Für den Test dieser umfassend geänderten Karten startet ein eigener Level-Fortschritt unter `level_008`; ältere gespeicherte Fortschrittsdaten bleiben unabhängig davon im App-Speicher erhalten.
+Der vorläufige App-Name lautet **ORBIFLUX** (Markenprüfung vor Veröffentlichung erforderlich). Das Chrome-Türkis-Launcher-Icon bleibt ohne Schrift. Die App-ID ist weiterhin `de.sschermer.kugelspiel`, `versionCode 15`. Für den Test dieser umfassend geänderten Karten startet ein eigener Level-Fortschritt unter `level_008`; ältere gespeicherte Fortschrittsdaten bleiben unabhängig davon im App-Speicher erhalten.
 
 Alle Spielgrafiken sind selbst mit Android Canvas gezeichnet. Das Launcher-Icon ist ein eigens für dieses Projekt generiertes Chrom-Türkis-Motiv und als WebP eingebunden; Herkunft siehe `THIRD_PARTY_NOTICES.md`. Es wurden keine unklar lizenzierten Fremdassets oder Audiodateien übernommen. Die Rechte am eigenen Code und an der Grafik bleiben bis zur ausdrücklichen Lizenzentscheidung vorbehalten. Ein öffentliches GitHub-Repository ist nicht automatisch Open Source. Weitere Angaben: `THIRD_PARTY_NOTICES.md`.
 

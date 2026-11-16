@@ -20,6 +20,34 @@ public final class HalfScreenControlsTest {
     public static void main(String[] args){
         HalfScreenControls c=new HalfScreenControls();
 
+        // Regression: visually stationary ball can briefly report no surface.
+        // The old GameView surface && abs(vx)<20 gate would skip the delay.
+        check(HorizontalMotion.restingForInput(0f,0f),"rest from zero velocity");
+        check(HorizontalMotion.restingForInput(12f,25f),"tiny movement considered rest");
+        check(HorizontalMotion.restingForInput(40f,40f),"small residual momentum considered rest");
+        check(!HorizontalMotion.restingForInput(65f,0f),"rolling ball is moving");
+        check(!HorizontalMotion.restingForInput(0f,-400f),"fast falling ball is not resting");
+        c.press(81,HalfScreenControls.RIGHT,100,true);
+        c.reset();
+        check(!c.press(82,HalfScreenControls.LEFT,500,
+                HorizontalMotion.restingForInput(0f,0f)),"fresh first contact");
+        float x=0f,v=0f;
+        for(int t=500;t<700;t+=8){
+            check(c.direction(t)==0,"stationary first finger held during 200ms");
+            v=step(c,t,v,true);
+            x+=v/120f;
+            close(x,0f,"no sideways displacement during input delay");
+        }
+        check(c.press(83,HalfScreenControls.RIGHT,680,false),
+                "second finger within delayed window triggers straight jump");
+        check(c.isVerticalPair(),"vertical pair remains active after second tap");
+        for(int t=680;t<=2500;t+=8){
+            v=step(c,t,v,false);
+            x+=v/120f;
+            close(x,0f,"vertical jump without sideways drift");
+        }
+        c.reset();
+
         // First touch from rest has exactly 200 ms of movement delay.
         check(!c.press(1,HalfScreenControls.RIGHT,1000,true),"first touch only steers");
         check(c.direction(1000)==0&&c.direction(1199)==0,"start delay through 199 ms");

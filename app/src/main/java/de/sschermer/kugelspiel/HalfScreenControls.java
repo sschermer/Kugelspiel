@@ -5,7 +5,8 @@ import java.util.HashMap;
 /**
  * Invisible two-half steering and gesture recognition.
  *
- * From a finger-free screen and a stationary ball, the first contact has a
+ * From a finger-free screen and a stationary ball (judged by actual velocities,
+ * not a potentially flickering ground-contact flag), the first contact has a
  * 200 ms movement delay. An opposite-side second contact within that window
  * triggers a vertical jump. After either finger is lifted, the remaining
  * finger starts steering after another 200 ms, even if the ball is airborne.
