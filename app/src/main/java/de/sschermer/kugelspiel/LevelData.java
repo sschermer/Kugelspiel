@@ -11,7 +11,7 @@ import java.util.List;
 final class LevelData {
     static final int NONE=0, BLUE=1, ORANGE=2, VIOLET=3;
     static final int DOWN=1, UP=-1;
-    static final int COLOR=1, GRAVITY=2, POINT=3;
+    static final int COLOR=1, GRAVITY=2, POINT=3, HELIUM_FILL=4, HELIUM_DRAIN=5;
     static final int TILE=58;
     static final class Item {
         final float x,y; final int type,value;
@@ -20,6 +20,14 @@ final class LevelData {
     static final class Gate {
         final float x,top,bottom; final int color;
         Gate(float x,float top,float bottom,int color){this.x=x;this.top=top;this.bottom=bottom;this.color=color;}
+    }
+    /** A score door checks total collected points; points are NEVER spent. */
+    static final class ScoreGate {
+        final float x,top,bottom;final int threshold;
+        ScoreGate(float x,float top,float bottom,int points){
+            this.x=x;this.top=top;this.bottom=bottom;this.threshold=points;
+        }
+        boolean blocks(int points){return points<threshold;}
     }
     static final class Shaft {
         final float x1,x2,top,bottom;final boolean safe;
@@ -31,6 +39,7 @@ final class LevelData {
         final char[][] tiles;
         final List<Item> items;
         final List<Gate> gates;
+        final List<ScoreGate> scoreGates;
         final List<Shaft> shafts;
         final List<float[]> checkpoints;
         final float startX,startY,exitX,exitY;
@@ -41,6 +50,7 @@ final class LevelData {
             for(int r=0;r<rows;r++)System.arraycopy(b.grid[r],0,tiles[r],0,columns);
             items=Collections.unmodifiableList(new ArrayList<>(b.items));
             gates=Collections.unmodifiableList(new ArrayList<>(b.gates));
+            scoreGates=Collections.unmodifiableList(new ArrayList<>(b.scoreGates));
             shafts=Collections.unmodifiableList(new ArrayList<>(b.shafts));
             checkpoints=Collections.unmodifiableList(new ArrayList<>(b.checkpoints));
             startX=b.startX;startY=b.startY;exitX=b.exitX;exitY=b.exitY;
@@ -61,6 +71,7 @@ final class LevelData {
         final char[][] grid;
         final ArrayList<Item> items=new ArrayList<>();
         final ArrayList<Gate> gates=new ArrayList<>();
+        final ArrayList<ScoreGate> scoreGates=new ArrayList<>();
         final ArrayList<Shaft> shafts=new ArrayList<>();
         final ArrayList<float[]> checkpoints=new ArrayList<>();
         final float startX,startY,exitX,exitY;
@@ -110,6 +121,29 @@ final class LevelData {
         void gate(int lane,float fraction,int color){
             float x=pathX(lane,fraction);
             gates.add(new Gate(x,floorY(lane)-183,floorY(lane)-4,color));
+        }
+        void scoreGate(int lane,float fraction,int threshold) {
+            float x=pathX(lane,fraction);
+            scoreGates.add(new ScoreGate(x,floorY(lane)-172,floorY(lane)-4,threshold));
+        }
+        void heliumStation(int lane,float x,boolean fill){
+            float y=fill?floorY(lane)-15:ceilingY(lane)+15;
+            items.add(new Item(x,y,fill?HELIUM_FILL:HELIUM_DRAIN,0));
+        }
+        /** Three staggered functional platforms; missing middle step changes route choice. */
+        void brokenStairs(int lane,float fraction,boolean ascending){
+            int c=(int)(pathX(lane,fraction)/TILE);
+            int dir=lane%2==0?1:-1;
+            for(int step=0;step<3;step++){
+                if(step==1)continue; // intentional missing step
+                int col=c+dir*step;
+                if(col<=2||col>=width-3)continue;
+                int height=step==2?3:1;
+                int row=floor(lane)-height;
+                grid[row][col]='#';
+            }
+            float rewardX=(c+dir*2+.5f)*TILE;
+            point(rewardX,(floor(lane)-3)*TILE-22,10);
         }
         void platform(int lane,float fraction,int value) {
             float x=pathX(lane,fraction);
@@ -193,7 +227,8 @@ final class LevelData {
                 }
                 if(index>=3) {
                     // An optional intermediate platform: a controllable jump earns 10.
-                    b.platform(lane,.81f,10);
+                    if(index%2==1 || lane%2==0)b.brokenStairs(lane,.35f,index%2==0);
+                    else b.platform(lane,.78f,10);
                 }
                 if(lane<height-1){
                     int mainCenter=(lane%2==0?b.width-7:6);
@@ -206,6 +241,14 @@ final class LevelData {
                         b.gravity(optionalX+4*TILE,b.floorY(lane+1)-35,UP);
                         b.gravity(optionalX+5*TILE,b.ceilingY(lane)+35,DOWN);
                     }
+                    if(index>=5 && lane==height-2) {
+                        // Bonus ascent: after collecting early points, a second way
+                        // back to the upper floor is available through a helium socket.
+                        // Both apparatuses require careful centering and low speed.
+                        float socketX=(mainCenter+.5f)*TILE;
+                        b.heliumStation(lane+1,socketX,true);
+                        b.heliumStation(lane,socketX+3*TILE,false);
+                    }
                 }
                 if(index>=5 && lane%2==0 && lane<height-1) {
                     // Rare, short lethal pit with physically separate red warning.
@@ -217,6 +260,11 @@ final class LevelData {
                     if(!intersects)b.lethalPit(lane,col);
                 }
                 if(index>=4)b.checkpoint(lane,.84f);
+                    if(lane==0 || (index>=6 && lane%2==1)) {
+                        // Early 1+5 points allow the inter-room door.
+                        // The threshold is a permission, not a deduction.
+                        b.scoreGate(lane,.55f,6);
+                    }
             }
             result.add(b.build());
         }
