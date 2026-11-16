@@ -17,7 +17,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
-      - name: Verify tile-maze connectivity and safe versus dangerous holes
+      - name: Validate thin shafts, full-height gates and bounce-chain mechanics
         run: |
           mkdir -p /tmp/kugelspiel-check
           javac -encoding UTF-8 -d /tmp/kugelspiel-check app/src/main/java/de/sschermer/kugelspiel/LevelData.java tools/LevelRouteTest.java app/src/main/java/de/sschermer/kugelspiel/BounceChain.java tools/BounceChainTest.java
@@ -33,6 +33,6 @@ jobs:
         run: gradle --no-daemon assembleDebug
       - uses: actions/upload-artifact@v4
         with:
-          name: kugelspiel-iteration-005-debug
+          name: kugelspiel-iteration-006-debug
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
