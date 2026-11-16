@@ -94,11 +94,13 @@ final class GameView extends View {
     /** Structural floors/ceilings are only 19 units thick (was 58). */
     private float tileTop(int col,int row) {
         if(row<0 || col<2 || col>=world().columns-2) return row*TILE;
+        if(world().tiles[row][col]=='X')return row*TILE;
         if(row==1)return (row+1)*TILE-LevelData.DIVIDER_THICKNESS; // topmost ceiling
         return row*TILE;                    // floor or intermediate step
     }
     private float tileBottom(int col,int row) {
         if(row<0 || col<2 || col>=world().columns-2)return (row+1)*TILE;
+        if(world().tiles[row][col]=='X')return (row+1)*TILE;
         if(row==1)return (row+1)*TILE;
         return row*TILE+LevelData.DIVIDER_THICKNESS;
     }
@@ -303,7 +305,7 @@ final class GameView extends View {
         int x0=Math.max(0,(int)Math.floor(camX/TILE)-2),x1=Math.min(world().columns-1,(int)Math.ceil((camX+vw)/TILE)+2);
         int y0=Math.max(0,(int)Math.floor(camY/TILE)-2),y1=Math.min(world().rows-1,(int)Math.ceil((camY+vh)/TILE)+2);
         for(int row=y0;row<=y1;row++)for(int col=x0;col<=x1;col++){
-            if(world().tiles[row][col]!='#')continue;
+            if(!world().solid(col,row))continue;
             float a=col*TILE,top=tileTop(col,row),bottom=tileBottom(col,row);
             p.setShader(new LinearGradient(a,top,a,bottom,0xff91a9b7,0xff355262,Shader.TileMode.CLAMP));
             c.drawRect(a,top,a+TILE,bottom,p);p.setShader(null);
