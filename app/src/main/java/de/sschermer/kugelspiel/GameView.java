@@ -94,13 +94,13 @@ final class GameView extends View {
     /** Structural floors/ceilings are only 19 units thick (was 58). */
     private float tileTop(int col,int row) {
         if(row<0 || col<2 || col>=world().columns-2) return row*TILE;
-        if(row%6==1)return (row+1)*TILE-19; // underside of ceiling
+        if(row==1)return (row+1)*TILE-LevelData.DIVIDER_THICKNESS; // topmost ceiling
         return row*TILE;                    // floor or intermediate step
     }
     private float tileBottom(int col,int row) {
         if(row<0 || col<2 || col>=world().columns-2)return (row+1)*TILE;
-        if(row%6==1)return (row+1)*TILE;
-        return row*TILE+19;
+        if(row==1)return (row+1)*TILE;
+        return row*TILE+LevelData.DIVIDER_THICKNESS;
     }
     private void moveHorizontal(float d) {
         if(Math.abs(d)<.00001f)return;
@@ -316,37 +316,53 @@ final class GameView extends View {
             }
         }
     }
+    /**
+     * Mark only the actual missing divider: a turquoise 19-unit-thin portal
+     * (or red lethal break), never a solid-looking block between two floors.
+     */
     private void shafts(Canvas c){
-        for(LevelData.Shaft s:world().shafts){
-            float center=(s.x1+s.x2)*.5f;
-            if(s.safe){
-                p.setColor(0x552de2d0);
-                c.drawRoundRect(new RectF(s.x1+5,s.top-13,s.x2-5,s.bottom+12),12,12,p);
-                p.setColor(0xff55ffda);p.setStrokeWidth(5);
-                c.drawLine(s.x1+6,s.top-5,s.x1+6,s.bottom+9,p);
-                c.drawLine(s.x2-6,s.top-5,s.x2-6,s.bottom+9,p);
-                p.setTextAlign(Paint.Align.CENTER);p.setTextSize(28);
-                p.setTypeface(Typeface.DEFAULT_BOLD);p.setColor(0xffd9fff7);
-                c.drawText("↓",center,(s.top+s.bottom)*.5f+9,p);
-                p.setTextSize(13);c.drawText("DURCHGANG",center,s.top-19,p);
+        for(LevelData.Shaft shaft:world().shafts){
+            float leftEdge=shaft.x1,rightEdge=shaft.x2;
+            float top=shaft.top,bottom=shaft.bottom;
+            float center=(leftEdge+rightEdge)*.5f;
+            if(shaft.safe){
+                p.setColor(0x554affd8);
+                c.drawRect(leftEdge+3,top+1,rightEdge-3,bottom-1,p);
+                p.setColor(0xff54f3d7);
+                p.setStrokeWidth(5);
+                // Short vertical rails end at the actual surface, not
+                // at an artificial 100-unit-high decorative shaft.
+                c.drawLine(leftEdge+3,top-7,leftEdge+3,bottom+6,p);
+                c.drawLine(rightEdge-3,top-7,rightEdge-3,bottom+6,p);
+                p.setColor(0xffc8fff1);
+                p.setTypeface(Typeface.DEFAULT_BOLD);
+                p.setTextAlign(Paint.Align.CENTER);
+                p.setTextSize(18);
+                c.drawText("↓",center,bottom-3,p);
+                p.setTextSize(13);
+                c.drawText("DURCHGANG",center,top-14,p);
                 p.setTextAlign(Paint.Align.LEFT);
             }else{
-                p.setColor(0xe2140910);
-                c.drawRect(s.x1,s.top,s.x2,s.bottom,p);
-                p.setColor(0xfff2484c);p.setStrokeWidth(6);
-                c.drawLine(s.x1,s.top,s.x2,s.top,p);
-                // Repeated red teeth make a lethal gap unmistakable.
+                p.setColor(0xff390e18);
+                c.drawRect(leftEdge,top,rightEdge,bottom,p);
+                p.setColor(0xffff6464);
+                p.setStrokeWidth(4);
+                c.drawLine(leftEdge,top,rightEdge,top,p);
                 Path teeth=new Path();
-                for(float xx=s.x1;xx<s.x2;xx+=18){
-                    teeth.moveTo(xx,s.top+6);
-                    teeth.lineTo(xx+9,s.top+28);
-                    teeth.lineTo(Math.min(s.x2,xx+18),s.top+6);
+                for(float x=leftEdge;x<rightEdge;x+=16){
+                    teeth.moveTo(x,top+3);
+                    teeth.lineTo(x+8,top+18);
+                    teeth.lineTo(Math.min(rightEdge,x+16),top+3);
                 }
-                p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(3);
-                c.drawPath(teeth,p);p.setStyle(Paint.Style.FILL);
-                p.setTextAlign(Paint.Align.CENTER);p.setTypeface(Typeface.DEFAULT_BOLD);
-                p.setTextSize(15);p.setColor(0xffffe3d7);
-                c.drawText("GEFAHR",center,s.top-17,p);
+                p.setStyle(Paint.Style.STROKE);
+                p.setStrokeWidth(2.5f);
+                c.drawPath(teeth,p);
+                p.setStyle(Paint.Style.FILL);
+                p.setTextAlign(Paint.Align.CENTER);
+                p.setTypeface(Typeface.DEFAULT_BOLD);
+                p.setTextSize(14);
+                p.setColor(0xffffc4bd);
+                c.drawText("GEFAHR",center,top-13,p);
                 p.setTextAlign(Paint.Align.LEFT);
             }
         }
