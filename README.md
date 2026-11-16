@@ -1,50 +1,46 @@
 # Kugelspiel
 
-Native Android logic puzzle-platformer — **Iteration 006 / 0.6.0**.
+Native Android puzzle-platformer — **Iteration 007 / version 0.7.0**.
 
-## Geometry correction based on phone screenshot
+## Individually designed worlds, not repeated templates
 
-The previous prototype rendered a large turquoise or red rectangle spanning the vertical gap between levels. Even though floors had already become 19 units thick, the highlighted passages were still huge. This iteration makes the geometry and visuals match:
+Stages 1–3 remain tutorials. **Stages 4–6 now come from individual level-design methods** rather than the regular stage generator.
 
-- Each floor is also the ceiling of the level below: one **19-world-unit shared divider**, not two different plates with an empty buffer between them.
-- Safe passages and lethal gaps now cross only that actual **19-unit divider**, with a narrower opening of **three 58-unit tiles**.
-- Safe openings are marked with **turquoise short edge rails, a downward arrow and DURCHGANG**, not a giant full-height turquoise fill.
-- Deadly gaps remain visibly different: **dark red interior, red teeth and GEFAHR**.
-- Structural collision is matched to the visible thin divider throughout the maze; intermediate platforms remain functional.
-- **Every colored gate spans the full navigable room height from ceiling underside to floor top.** A 250% jump cannot bypass a closed colored barrier.
-- For consistency, point-requirement interdoors also span full room height.
+| Stage | Concept | Map |
+|---|---|---|
+| 4: Verzweigte Höhlen | Loops, broad cave collapses, orange and blue color paths, rock obstacles and an optional 16-point chamber | 3 storeys, 56 tiles wide, 8 independently placed vertical openings, 29 points required |
+| 5: Der Sprungturm | Vertical exploration, a missing stair, 10-point bonus platforms, 18-point door, optional helium travel | 4 storeys, 66 tiles wide, multiple offset passage openings, 36 points required |
+| 6: Zwei Welten | Two separate horizontal regions, 28-point interdoors on all four floors; return to the left exit after collecting right-side points | 4 storeys, 78 tiles wide, 48-point exit, optional helium and a lethal pit |
 
-## Retained mechanics
+The three worlds contain genuine full-height rock blocks as well as intermediate functional platforms. Each has **hand-placed galleries with sections of the intermediate floor missing**. These large turquoise-marked safe openings are a different width from the normal three-tile connectors. The stage structure is driven by its puzzle, not by uniform item spacing.
 
-- Exactly three touch controls: left/right/jump.
-- Bounce-chain jumping: normal 100% height, timed automatic landing hop, three cumulative boosters to 150/200/250%, unlimited chains at the capped height, **instant reset to 100% on any head-to-ceiling contact**.
-- Reusable color and gravity switches.
-- Helium fill and drain machines require positioning and low movement speed. Filling can be gated by score requirements.
-- Collectible 1/5/10 point tokens remain visible after collection, changing from black/white to translucent white/black, and count only once.
-- Exits and intermediate doors open when the necessary accumulated points are reached. Points are not spent.
-- Ten progressively larger scrolling multi-floor mazes. Hold left+right simultaneously to restart the current level.
+Stages 7–10 deliberately retain their existing layouts while stages 4–6 undergo device playtesting. They will be redesigned after this design direction has been tested.
 
-Existing saved progress from iteration 005 remains on the same level key (`level_005`) so installing this update does not intentionally reset stage progress.
+## Geometry and mechanics
 
-## Build and validation
+- Shared floor/ceiling dividers have **19 units** of actual collision and visual thickness.
+- Safe passages are turquoise with an arrow and the word DURCHGANG; lethal pits are dark red with spikes and the word GEFAHR.
+- All color gates and point interdoors reach from floor to ceiling and cannot be bypassed by stacked jumps.
+- Three simultaneous touch buttons: left, right and jump.
+- Metallic ball, reusable gravity switches, and clearly distinguished blue/orange/violet color pickups.
+- Jump height can stack from 100% to **150%, 200%, 250%**; unlimited further chains stay at 250%. Ceiling contact resets the boost to 100%.
+- Helium filling/draining sockets require centering and low speed. A filling socket can demand a minimum score.
+- Point tokens (1, 5, 10): black with a white number when available; translucent white with a black number when already collected. Points are awarded only once and are never spent.
+- Exits and intermediate doors show the number of missing points. Checkpoints and stage progress remain active.
+- Holding left and right together for 2.5 seconds resets the current stage.
 
-JDK 17; Android SDK 35; Gradle 8.10.2.
+Saved progress remains on the same stage key as in Iteration 005, so it is not intentionally reset.
 
-Run `gradle assembleDebug` or GitHub Actions. Output: `app/build/outputs/apk/debug/app-debug.apk`. CI artifact: `kugelspiel-iteration-006-debug`.
+## Building and testing
 
-To run the pure-Java structural and bounce tests:
+Requirements: JDK 17, Gradle 8.10.2, Android SDK 35. GitHub Actions builds the artifact **kugelspiel-iteration-007-debug**. The workflow compiles the pure-Java level and jump tests, then packages a debug APK.
 
-```sh
-mkdir -p out
-javac -encoding UTF-8 -d out app/src/main/java/de/sschermer/kugelspiel/LevelData.java tools/LevelRouteTest.java app/src/main/java/de/sschermer/kugelspiel/BounceChain.java tools/BounceChainTest.java
-java -cp out de.sschermer.kugelspiel.LevelRouteTest
-java -cp out de.sschermer.kugelspiel.BounceChainTest
-```
+Source layout: LevelData.java (geometry), HandcraftedLevels.java (three individually designed stages), GameView.java (Android Canvas and controls), BounceChain.java (stacked jump rules), LevelRouteTest.java and BounceChainTest.java (structural tests).
 
-The structure tests explicitly check the 19-unit shared divider, 3-tile opening, and exact full-room gate spans. **Automated structural checks do not constitute a real-device playthrough**; playability and difficulty across all ten levels require device testing.
+The tests check map dimensions, floor gaps, full-room gate heights, unique stage structure, score-gate requirements, and jump-state rules. **They do not simulate a complete real-device run and cannot guarantee that every route is feasible or free of softlocks.** Device playtesting is necessary.
 
-## Copyright and signing
+## Public repo, rights and signing
 
-Original Canvas graphics, with no third-party runtime assets. Code and graphics remain owner-controlled pending explicit license approval; public visibility alone does not grant reuse rights. See `THIRD_PARTY_NOTICES.md`.
+No external game artwork or audio was added. Original Canvas graphics are created in code. All project code and artwork remain owner-controlled with no reuse license selected. Public repository visibility does not grant reuse rights; consult THIRD_PARTY_NOTICES.md.
 
-Package: `de.sschermer.kugelspiel`; versionCode **6**. Debug APK signing is currently not stable between CI runs; updating an installed debug build may require uninstalling its predecessor. Never add signing keys or passwords to the public repository.
+App ID remains de.sschermer.kugelspiel, versionCode 7. GitHub Actions debug signing may differ between builds, so updates might require removing an older debug APK. Persistent signing keys must not be committed to the public repository.
