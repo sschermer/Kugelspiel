@@ -50,11 +50,23 @@ public final class LevelRouteTest {
         }
         boolean[][] open=reachable(w);
         require(open[row(w.exitY)][col(w.exitX)],"Exit not connected in tile maze "+i);
+        for(LevelData.ScoreGate gate:w.scoreGates){
+            require(gate.threshold>0 && gate.threshold<=w.pointsAvailable(),
+                    "Inter-room point gate requires unobtainable points at "+i);
+        }
+        int fills=0,drains=0,stairs=0;
         int all=0,ones=0,fives=0,tens=0;
         for(LevelData.Item item:w.items){
             int c=col(item.x),r=row(item.y);
             require(c>=0&&r>=0&&c<w.columns&&r<w.rows,"Item outside map "+i);
             require(open[r][c],"Item unreachable in tile geometry "+i+" at "+c+","+r);
+            if(item.type==LevelData.HELIUM_FILL){
+                fills++;
+                require(item.value>=6 && item.value<=7*(w.stories-1),
+                        "Helium must only unlock after enough early-room points");
+            } else if(item.type==LevelData.HELIUM_DRAIN){
+                drains++;
+            }
             if(item.type==LevelData.POINT){
                 require(item.value==1||item.value==5||item.value==10,
                     "Invalid score item "+i);
@@ -65,6 +77,11 @@ public final class LevelRouteTest {
             }
         }
         require(all>=w.target && ones>0 && fives>0,"Point distribution insufficient "+i);
+        require(fills==drains,"Each helium filler needs a return-to-normal drain");
+        if(i>=6) {
+            require(fills>=1,"Later mazes should contain a gated helium alternative");
+            require(w.scoreGates.size()>=1,"Later mazes should contain score doors");
+        }
         if(i>=4)require(tens>=w.stories,"Advanced stages require optional ten-pointers "+i);
         int[][] count=new int[w.rows][w.columns];
         for(LevelData.Shaft s:w.shafts){
