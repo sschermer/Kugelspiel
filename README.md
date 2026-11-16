@@ -1,49 +1,38 @@
 # Kugelspiel
 
-Native Android puzzle-platformer — **Iteration 005, version 0.5.0**.
+Native Android logic puzzle-platformer — **Iteration 006 / 0.6.0**.
 
-## Controls
+## Geometry correction based on phone screenshot
 
-Exactly three multitouch buttons: **left**, **right**, **jump**. Hold left and right together for 2.5 seconds to restart the current level. Progress for the new mechanics is saved separately from iteration 004.
+The previous prototype rendered a large turquoise or red rectangle spanning the vertical gap between levels. Even though floors had already become 19 units thick, the highlighted passages were still huge. This iteration makes the geometry and visuals match:
 
-## New mechanics
+- Each floor is also the ceiling of the level below: one **19-world-unit shared divider**, not two different plates with an empty buffer between them.
+- Safe passages and lethal gaps now cross only that actual **19-unit divider**, with a narrower opening of **three 58-unit tiles**.
+- Safe openings are marked with **turquoise short edge rails, a downward arrow and DURCHGANG**, not a giant full-height turquoise fill.
+- Deadly gaps remain visibly different: **dark red interior, red teeth and GEFAHR**.
+- Structural collision is matched to the visible thin divider throughout the maze; intermediate platforms remain functional.
+- **Every colored gate spans the full navigable room height from ceiling underside to floor top.** A 250% jump cannot bypass a closed colored barrier.
+- For consistency, point-requirement interdoors also span full room height.
 
-### Jump chains (explicit owner-approved rules)
+## Retained mechanics
 
-- Normal jump starts at **100% HEIGHT**.
-- When landing after a jump, the ball performs **one small automatic intermediate hop**.
-- Press jump during this short **0.36-second** timing window to turn the next jump into **150% height**.
-- Repeat on subsequent landings to stack up to **200%, then 250% height** (three boosts).
-- **Unlimited further chains** are allowed, but height stays capped at **250%**.
-- On ANY ceiling/head collision, jump energy is **immediately reset to baseline 100%** (jump height 1).
-- Missing the hop window ends the chain on landing. A boost can be rebuilt by jumping again.
-- The code scales launch velocity by square root of the height factor; the physical apex, not launch speed, is the percentage.
-- HUD shows the active jump height and the ball shows one illuminated segment per boost.
+- Exactly three touch controls: left/right/jump.
+- Bounce-chain jumping: normal 100% height, timed automatic landing hop, three cumulative boosters to 150/200/250%, unlimited chains at the capped height, **instant reset to 100% on any head-to-ceiling contact**.
+- Reusable color and gravity switches.
+- Helium fill and drain machines require positioning and low movement speed. Filling can be gated by score requirements.
+- Collectible 1/5/10 point tokens remain visible after collection, changing from black/white to translucent white/black, and count only once.
+- Exits and intermediate doors open when the necessary accumulated points are reached. Points are not spent.
+- Ten progressively larger scrolling multi-floor mazes. Hold left+right simultaneously to restart the current level.
 
-### Helium stations
+Existing saved progress from iteration 005 remains on the same level key (`level_005`) so installing this update does not intentionally reset stage progress.
 
-- Cyan **HE+** filling recess; amber **HE-** draining recess. Both functional apparatuses, not loose pickups.
-- The metallic ball must be centered **within 10 game units horizontally** and **19 vertically** and nearly stationary (speed under 27 horizontal and 30 vertical units/second), for **0.55 seconds**. The apparatus visually charges before it activates.
-- When filled, the ball **automatically rises slowly**, with left/right steering; jump stacking is disabled until helium is drained.
-- A matching draining socket reverts the ball to normal gravity/rolling.
-- The filling apparatus **requires points collected in earlier rooms** (its threshold is displayed when still locked). Points are permissions and are not spent.
-- Apparatuses remain reusable; the new level layout supports alternative routes and safe passages.
+## Build and validation
 
-### More deliberate maze geometry
+JDK 17; Android SDK 35; Gradle 8.10.2.
 
-- Floor/ceiling collision strips are **19** units thick instead of an entire 58-unit tile.
-- Larger, multi-floor scrolling mazes have partial platforms with a **missing stair**, creating a choice between a lower route and chaining jumps upward.
-- Several areas contain **score-based intermediate doors**, with live **NOCH X** indicators. Points are NOT deducted and missing points can be collected by backtracking.
-- Turquoise arrowed passages remain safe; red warning pits are fatal.
-- Existing points stay black with white numerals until collected, then semi-transparent white with black numerals. Each point token awards only once.
+Run `gradle assembleDebug` or GitHub Actions. Output: `app/build/outputs/apk/debug/app-debug.apk`. CI artifact: `kugelspiel-iteration-006-debug`.
 
-## Test/build
-
-JDK 17, Android SDK 35, Gradle 8.10.2.
-
-`gradle assembleDebug` builds an Android APK in `app/build/outputs/apk/debug/app-debug.apk`. GitHub Actions tests both the maze structure and the pure-Java bounce-chain state machine before building and uploading `kugelspiel-iteration-005-debug`.
-
-Manually run the tests:
+To run the pure-Java structural and bounce tests:
 
 ```sh
 mkdir -p out
@@ -52,10 +41,10 @@ java -cp out de.sschermer.kugelspiel.LevelRouteTest
 java -cp out de.sschermer.kugelspiel.BounceChainTest
 ```
 
-The checks cover map connectivity, safe vs fatal gaps, available score, point-gated helium and score doors, matching stations, and jump stacking/reset math. **They do not simulate real touch input, actual physics-driven reachability, or prove all player routes are free of softlocks. Device playtesting remains necessary.**
+The structure tests explicitly check the 19-unit shared divider, 3-tile opening, and exact full-room gate spans. **Automated structural checks do not constitute a real-device playthrough**; playability and difficulty across all ten levels require device testing.
 
-## Rights and security
+## Copyright and signing
 
-The app does not bundle third-party gameplay assets or libraries. Drawings use Android Canvas. Project rights are retained pending the owner's explicit code/asset license decision; public GitHub visibility does not confer reuse rights. See `THIRD_PARTY_NOTICES.md`.
+Original Canvas graphics, with no third-party runtime assets. Code and graphics remain owner-controlled pending explicit license approval; public visibility alone does not grant reuse rights. See `THIRD_PARTY_NOTICES.md`.
 
-Package ID remains `de.sschermer.kugelspiel`, versionCode **5**. GitHub Actions debug builds do not retain a stable signing key between runs; updating over an older debug APK can fail. Configure persistent private signing before offering update-compatible releases, never commit the keystore to the public repository.
+Package: `de.sschermer.kugelspiel`; versionCode **6**. Debug APK signing is currently not stable between CI runs; updating an installed debug build may require uninstalling its predecessor. Never add signing keys or passwords to the public repository.
