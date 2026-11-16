@@ -196,20 +196,20 @@ final class LevelData {
                     b.platform(lane,.81f,10);
                 }
                 if(lane<height-1){
-                    int mainCenter=(lane%2==0?width-7:6);
+                    int mainCenter=(lane%2==0?b.width-7:6);
                     b.shaft(lane,mainCenter,true);
                     if(index>=3){
                         // Alternative connector: skip part of the corridor or return to it.
-                        b.shaft(lane,width/2+(lane%2==0?-3:3),true);
+                        b.shaft(lane,b.width/2+(lane%2==0?-3:3),true);
                         // Reversible vertical exploration from the lower floor.
-                        float optionalX=(width/2+(lane%2==0?-3:3))*TILE;
+                        float optionalX=(b.width/2+(lane%2==0?-3:3))*TILE;
                         b.gravity(optionalX+4*TILE,b.floorY(lane+1)-35,UP);
                         b.gravity(optionalX+5*TILE,b.ceilingY(lane)+35,DOWN);
                     }
                 }
                 if(index>=5 && lane%2==0 && lane<height-1) {
                     // Rare, short lethal pit with physically separate red warning.
-                    int col=lane%2==0?width/3:width*2/3;
+                    int col=lane%2==0?b.width/3:b.width*2/3;
                     boolean intersects=false;
                     for(Shaft s:b.shafts)
                         if(s.safe&&s.top==b.floorY(lane) && col*TILE>s.x1-3*TILE && col*TILE<s.x2+3*TILE)
