@@ -603,7 +603,8 @@ final class GameView extends View {
         c.drawText(touchHalves?"Neustart im Menü":"← + → halten: Neustart",vw-26,vh-16,p);
         p.setTextAlign(Paint.Align.LEFT);
         // Functional diagnostics for this debug APK; removed from release builds.
-        if(touchHalves&&BuildConfig.DEBUG){
+        if(touchHalves&&(getContext().getApplicationInfo().flags
+                & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE)!=0){
             p.setTypeface(Typeface.DEFAULT_BOLD);
             p.setTextAlign(Paint.Align.CENTER);
             p.setTextSize(17);p.setColor(0xffb1fff1);
