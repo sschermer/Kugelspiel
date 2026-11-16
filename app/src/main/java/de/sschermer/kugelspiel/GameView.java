@@ -193,15 +193,12 @@ final class GameView extends View {
             if(resetHold>=2.5f){begin(false);msg("Level neu gestartet");return;}
         }else resetHold=0;
 
-        if(touchHalves){
-            syncHalfMovement(android.os.SystemClock.uptimeMillis());
-            // A simultaneous two-thumb jump must have no residual horizontal inertia.
-            if(halfControls.isVerticalPair())vx=0f;
-        }
+        if(touchHalves)syncHalfMovement(android.os.SystemClock.uptimeMillis());
         int command=(right.isEmpty()?0:1)-(left.isEmpty()?0:1);
-        if(command!=0)vx+=command*(surface?1320f:860f)*dt;
-        else vx*=Math.max(0,1-(surface?10f:3f)*dt);
-        vx=clamp(vx,-SPEED,SPEED);
+        // A dual-zone hold overrides acceleration AND existing momentum.
+        // Both halves must stay motionless even when the second finger arrived late.
+        vx=HorizontalMotion.step(vx,command,surface,
+                touchHalves&&halfControls.bothSidesHeld(),dt,SPEED);
         bounce.update(dt);
         jumpBuffer=Math.max(0,jumpBuffer-dt);
         if(surface&&!helium)coyote=.15f; else coyote=Math.max(0,coyote-dt);
@@ -709,8 +706,8 @@ final class GameView extends View {
             if(action==MotionEvent.ACTION_UP)handleMenuTap(e.getX(idx),e.getY(idx));
             return true;
         }
-        if((action==MotionEvent.ACTION_DOWN||action==MotionEvent.ACTION_POINTER_DOWN)
-                &&menuHit(e.getX(idx),e.getY(idx))){
+        // Secondary fingers always belong to gameplay, not the menu button.
+        if(action==MotionEvent.ACTION_DOWN&&menuHit(e.getX(idx),e.getY(idx))){
             menuOpen=true;clearControls();return true;
         }
         if(touchHalves){
@@ -726,11 +723,12 @@ final class GameView extends View {
                         e.getEventTime(),startingAtRest);
                 if(jumpNow){
                     if(halfControls.isVerticalPair()){
-                        // Restore the position if the second thumb arrived slightly
-                        // after movement began at the 100 ms boundary.
+                        // Correct the small takeoff drift within 180 ms.
                         x=twoFingerTakeoffX;
-                        vx=0f;
                     }
+                    // Every opposite-half jump must halt horizontal momentum,
+                    // even when its second finger arrives later than 180 ms.
+                    if(halfControls.bothSidesHeld())vx=0f;
                     requestJump();
                 }
             }else if(action==MotionEvent.ACTION_MOVE){

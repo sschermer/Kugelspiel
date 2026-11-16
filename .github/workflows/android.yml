@@ -20,7 +20,7 @@ jobs:
       - name: Validate ten all-points labyrinths, functional mechanics and jump chains
         run: |
           mkdir -p /tmp/kugelspiel-check
-          javac -encoding UTF-8 -d /tmp/kugelspiel-check app/src/main/java/de/sschermer/kugelspiel/LevelData.java app/src/main/java/de/sschermer/kugelspiel/HandcraftedLevels.java app/src/main/java/de/sschermer/kugelspiel/CuratedWorlds.java tools/LevelRouteTest.java app/src/main/java/de/sschermer/kugelspiel/BounceChain.java tools/BounceChainTest.java app/src/main/java/de/sschermer/kugelspiel/HalfScreenControls.java tools/HalfScreenControlsTest.java
+          javac -encoding UTF-8 -d /tmp/kugelspiel-check app/src/main/java/de/sschermer/kugelspiel/LevelData.java app/src/main/java/de/sschermer/kugelspiel/HandcraftedLevels.java app/src/main/java/de/sschermer/kugelspiel/CuratedWorlds.java tools/LevelRouteTest.java app/src/main/java/de/sschermer/kugelspiel/BounceChain.java tools/BounceChainTest.java app/src/main/java/de/sschermer/kugelspiel/HorizontalMotion.java app/src/main/java/de/sschermer/kugelspiel/HalfScreenControls.java tools/HalfScreenControlsTest.java
           java -cp /tmp/kugelspiel-check de.sschermer.kugelspiel.LevelRouteTest
           java -cp /tmp/kugelspiel-check de.sschermer.kugelspiel.BounceChainTest
           java -cp /tmp/kugelspiel-check de.sschermer.kugelspiel.HalfScreenControlsTest
@@ -30,7 +30,7 @@ jobs:
           java -Djava.awt.headless=true -cp /tmp/kugelspiel-check de.sschermer.kugelspiel.LevelPreview /tmp/kugelspiel-previews
       - uses: actions/upload-artifact@v4
         with:
-          name: orbiflux-iteration-012-level-overviews
+          name: orbiflux-iteration-013-level-overviews
           path: /tmp/kugelspiel-previews/level_*.png
           if-no-files-found: error
       - name: Install Android SDK platform
@@ -43,7 +43,7 @@ jobs:
         run: gradle --no-daemon assembleDebug
       - uses: actions/upload-artifact@v4
         with:
-          name: orbiflux-iteration-012-debug
+          name: orbiflux-iteration-013-debug
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
       - name: Publish direct-download preview APK on GitHub Releases

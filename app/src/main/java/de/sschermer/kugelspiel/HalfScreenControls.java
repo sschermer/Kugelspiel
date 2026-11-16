@@ -4,8 +4,9 @@ import java.util.HashMap;
 
 /**
  * Invisible two-zone touch control. The first held finger steers; an additional
- * finger on the opposite side triggers one jump. From a horizontal standstill,
- * a 100 ms grace window recognizes a simultaneous two-finger vertical jump.
+ * finger on the opposite side triggers one jump. As long as pointers occupy
+ * opposite halves, horizontal input MUST remain blocked regardless of timing.
+ * A 100 ms start delay and a 180 ms takeoff-position correction are separate.
  */
 final class HalfScreenControls {
     static final int LEFT=1,RIGHT=2;
@@ -63,11 +64,16 @@ final class HalfScreenControls {
     int direction(long now){
         Integer side=sides.get(lead);
         if(side==null)return 0;
-        if(verticalPair&&bothSides())return 0;
+        // Never allow the lead finger to accelerate while both halves are held.
+        // This lock is independent of the 180-ms takeoff-correction window.
+        if(bothSides())return 0;
         if(pendingStandstill&&now>=firstDown
                 &&now-firstDown<MOVEMENT_DELAY_MS)return 0;
         return side;
     }
+    /** Hard movement lock whenever pointers occupy both half-screen zones. */
+    boolean bothSidesHeld(){return bothSides();}
+    /** Only used to undo the short start drift before a near-simultaneous jump. */
     boolean isVerticalPair(){return verticalPair&&bothSides();}
     private boolean bothSides(){
         return sides.containsValue(LEFT)&&sides.containsValue(RIGHT);
