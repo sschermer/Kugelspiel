@@ -5,106 +5,211 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Pure Java, hand-authored puzzle rules. No Android dependency: the routes can
- * be checked by the command-line test in tools/LevelRouteTest.java.
+ * Curated data for ten increasingly long puzzle levels.
+ * Coordinates are world units, not screen pixels.
+ *
+ * Gravity/color switches are persistent and repeatable.
+ * Point tokens score only once per level; their inactive shells remain visible.
  */
 final class LevelData {
-    static final int NONE = 0;
-    static final int BLUE = 1;
-    static final int AMBER = 2;
-    static final int VIOLET = 3;
-    static final int DOWN = 1;
-    static final int UP = -1;
-    static final int BOTH = 0;
-    static final int FLOOR = 1;
-    static final int CEILING = -1;
-    static final int COLOR_ITEM = 1;
-    static final int GRAVITY_ITEM = 2;
+    static final int NONE=0, BLUE=1, AMBER=2, VIOLET=3;
+    static final int UP=-1, DOWN=1;
+    static final int CEILING=-1, MID=0, FLOOR=1, BOTH=2;
+    static final int COLOR=1, GRAVITY=2, POINT=3;
+    static final float TOP=170f, BOTTOM=670f;
 
     static final class Item {
-        final float x;
+        final float x, y;
         final int lane, type, value;
-        Item(float x, int lane, int type, int value) {
-            this.x = x; this.lane = lane; this.type = type; this.value = value;
+        Item(float x, float y, int lane, int type, int value) {
+            this.x=x; this.y=y; this.lane=lane; this.type=type; this.value=value;
         }
+        boolean once() {return type==POINT;}
     }
     static final class Gate {
         final float x;
-        final int lane, color;
-        Gate(float x, int lane, int color) {
-            this.x = x; this.lane = lane; this.color = color;
-        }
-        boolean blocks(int currentColor, int gravity) {
-            return currentColor != color && (lane == BOTH || lane == gravity);
+        final int lane,color;
+        Gate(float x,int lane,int color) {this.x=x;this.lane=lane;this.color=color;}
+        boolean blocks(int currentColor) {return currentColor!=color;}
+    }
+    static final class Segment {
+        final float from,to,y;
+        Segment(float from,float to,float y){this.from=from;this.to=to;this.y=y;}
+    }
+    static final class Hazard {
+        final float x,base;
+        Hazard(float x,float base){this.x=x;this.base=base;}
+    }
+    static final class Branch {
+        final float x;
+        final int lower,upper;
+        final boolean gated,challenging;
+        Branch(float x,int lower,int upper,boolean gated,boolean challenging){
+            this.x=x;this.lower=lower;this.upper=upper;this.gated=gated;this.challenging=challenging;
         }
     }
     static final class Level {
-        final String title, clue;
+        final String name,tip;
         final float finish;
+        final int target;
         final List<Item> items;
         final List<Gate> gates;
-        Level(String title, String clue, float finish, List<Item> items, List<Gate> gates) {
-            this.title=title; this.clue=clue; this.finish=finish;
-            this.items=Collections.unmodifiableList(new ArrayList<>(items));
-            this.gates=Collections.unmodifiableList(new ArrayList<>(gates));
+        final List<Segment> gaps,ledges;
+        final List<Hazard> spikes;
+        final List<Float> checkpoints;
+        final List<Branch> branches;
+        Level(Builder b){
+            name=b.name; tip=b.tip; finish=b.finish; target=b.target;
+            items=Collections.unmodifiableList(new ArrayList<>(b.items));
+            gates=Collections.unmodifiableList(new ArrayList<>(b.gates));
+            gaps=Collections.unmodifiableList(new ArrayList<>(b.gaps));
+            ledges=Collections.unmodifiableList(new ArrayList<>(b.ledges));
+            spikes=Collections.unmodifiableList(new ArrayList<>(b.spikes));
+            checkpoints=Collections.unmodifiableList(new ArrayList<>(b.checkpoints));
+            branches=Collections.unmodifiableList(new ArrayList<>(b.branches));
+        }
+        int availablePoints(){
+            int score=0;for(Item item:items)if(item.type==POINT)score+=item.value;
+            return score;
         }
     }
-    private static final class Builder {
-        final String title, clue;
+    static final class Builder {
+        final String name,tip;
         final float finish;
+        final int target;
         final List<Item> items=new ArrayList<>();
         final List<Gate> gates=new ArrayList<>();
-        Builder(String name, String hint, float end) {title=name;clue=hint;finish=end;}
-        Builder color(float x, int lane, int color) {items.add(new Item(x,lane,COLOR_ITEM,color));return this;}
-        Builder grav(float x,int lane,int direction) {items.add(new Item(x,lane,GRAVITY_ITEM,direction));return this;}
-        Builder gate(float x,int lane,int color) {gates.add(new Gate(x,lane,color));return this;}
-        Level build() {return new Level(title,clue,finish,items,gates);}
+        final List<Segment> gaps=new ArrayList<>(),ledges=new ArrayList<>();
+        final List<Hazard> spikes=new ArrayList<>();
+        final List<Float> checkpoints=new ArrayList<>();
+        final List<Branch> branches=new ArrayList<>();
+        Builder(String name,String tip,float finish,int target){
+            this.name=name;this.tip=tip;this.finish=finish;this.target=target;
+        }
+        Builder point(float x,int lane,int value){
+            float y=lane==FLOOR?BOTTOM-40:lane==CEILING?TOP+40:BOTTOM-122;
+            items.add(new Item(x,y,lane,POINT,value));return this;
+        }
+        Builder switchColor(float x,int lane,int value){
+            items.add(new Item(x,lane==CEILING?TOP+44:BOTTOM-44,lane,COLOR,value));return this;
+        }
+        Builder switchGravity(float x,int lane,int value){
+            items.add(new Item(x,lane==CEILING?TOP+44:BOTTOM-44,lane,GRAVITY,value));return this;
+        }
+        Builder gate(float x,int lane,int color) {
+            gates.add(new Gate(x,lane,color));return this;
+        }
+        Builder pit(float from,float to) {
+            gaps.add(new Segment(from,to,BOTTOM));return this;
+        }
+        Builder ledge(float from,float to,float top) {
+            ledges.add(new Segment(from,to,top));return this;
+        }
+        Builder spike(float x) {
+            spikes.add(new Hazard(x,BOTTOM));return this;
+        }
+        Builder checkpoint(float x) {
+            checkpoints.add(x);return this;
+        }
+        Builder branch(float x,boolean advanced,boolean hazard,boolean upperRich,int variant) {
+            int topReward=upperRich?10:5, bottomReward=upperRich?5:10;
+            branches.add(new Branch(x,bottomReward,topReward,advanced,hazard));
+            // The floor gravity switch can be bypassed with a generous jump.
+            // This permits two genuinely different paths through the room.
+            switchGravity(x+95,FLOOR,UP);
+            if(advanced) {
+                int floorColor=variant%3==0?AMBER:variant%3==1?VIOLET:BLUE;
+                int roofColor=variant%3==0?BLUE:variant%3==1?AMBER:VIOLET;
+                switchColor(x+310,FLOOR,floorColor);
+                switchColor(x+390,CEILING,roofColor);
+                gate(x+610,FLOOR,floorColor);
+                gate(x+610,CEILING,roofColor);
+            }
+            point(x+475,FLOOR,bottomReward);
+            point(x+485,CEILING,topReward);
+            // On the upper route the explicit down switch joins both paths.
+            switchGravity(x+705,CEILING,DOWN);
+            if(hazard) {
+                // Short, forgiving gap, plus reachable optional bonus ledge.
+                pit(x+548,x+613);
+                ledge(x+496,x+677,BOTTOM-91);
+                point(x+605,MID,5);
+                spike(x+778);
+            }
+            checkpoint(x+915);
+            point(x+992,FLOOR,1);
+            return this;
+        }
+        Level build(){return new Level(this);}
     }
-    static final List<Level> LEVELS = build();
 
-    private static List<Level> build() {
-        ArrayList<Level> result=new ArrayList<>();
-        result.add(new Builder("Die erste Farbe", "BLAU färbt die Kugel. Blaues Metall geht durch blaue Tore.", 980)
-            .color(290,FLOOR,BLUE).gate(625,BOTH,BLUE).build());
-        result.add(new Builder("Zwei Schlüssel", "Farbe bleibt, bis du ein anderes Farb-Item beruehrst.", 1290)
-            .color(255,FLOOR,BLUE).gate(545,BOTH,BLUE)
-            .color(780,FLOOR,AMBER).gate(1050,BOTH,AMBER).build());
-        result.add(new Builder("Oben ist unten", "Pfeile setzen die Schwerkraft dauerhaft nach oben oder unten.", 1160)
-            .grav(260,FLOOR,UP).color(540,CEILING,BLUE)
-            .gate(845,BOTH,BLUE).build());
-        result.add(new Builder("Seitenwechsel", "Auf der Decke gelangst du an andere Gegenstände.", 1540)
-            .grav(255,FLOOR,UP).color(540,CEILING,BLUE).gate(770,BOTH,BLUE)
-            .grav(905,CEILING,DOWN).color(1100,FLOOR,AMBER)
-            .gate(1335,BOTH,AMBER).build());
-        result.add(new Builder("Der Rückweg", "Nicht jedes nützliche Item liegt in Laufrichtung.", 1460)
-            .color(280,FLOOR,AMBER).gate(595,FLOOR,AMBER)
-            .grav(760,FLOOR,UP).color(360,CEILING,BLUE)
-            .gate(1180,BOTH,BLUE).build());
-        result.add(new Builder("Verpasst?", "Wechsle die Seite und hole nach, was unten lag.", 1460)
-            .grav(250,FLOOR,UP).grav(860,CEILING,DOWN)
-            .color(520,FLOOR,AMBER).gate(1200,BOTH,AMBER).build());
-        result.add(new Builder("Zwei Wege", "Ein Tor kann nur eine Seite des Raums sperren.", 1730)
-            .color(255,FLOOR,AMBER).gate(580,FLOOR,AMBER)
-            .grav(750,FLOOR,UP).color(370,CEILING,BLUE)
-            .gate(1050,CEILING,BLUE).grav(1170,CEILING,DOWN)
-            .color(1320,FLOOR,VIOLET).gate(1530,BOTH,VIOLET).build());
-        result.add(new Builder("Noch einmal zurück", "Das Farb-Item auf dem Boden bleibt erreichbar.", 1630)
-            .grav(265,FLOOR,UP).color(525,CEILING,BLUE)
-            .gate(790,CEILING,BLUE).grav(900,CEILING,DOWN)
-            .color(605,FLOOR,AMBER).gate(1370,BOTH,AMBER).build());
-        result.add(new Builder("Kreuzweg", "Farbtor und Gravitation blockieren verschiedene Spuren.", 1770)
-            .color(270,FLOOR,AMBER).gate(575,FLOOR,AMBER)
-            .grav(735,FLOOR,UP).color(370,CEILING,BLUE)
-            .gate(1030,CEILING,BLUE).grav(1150,CEILING,DOWN)
-            .color(860,FLOOR,VIOLET).gate(1510,BOTH,VIOLET).build());
-        result.add(new Builder("Die große Schleife", "Plane den Rückweg zweimal. Nichts verschwindet.", 2050)
-            .color(235,FLOOR,AMBER).gate(550,FLOOR,AMBER)
-            .grav(675,FLOOR,UP).color(360,CEILING,BLUE)
-            .gate(945,CEILING,BLUE).grav(1080,CEILING,DOWN)
-            .color(795,FLOOR,VIOLET).gate(1390,FLOOR,VIOLET)
-            .grav(1500,FLOOR,UP).color(1200,CEILING,BLUE)
-            .gate(1805,BOTH,BLUE).build());
-        return Collections.unmodifiableList(result);
+    static final List<Level> LEVELS=create();
+
+    private static List<Level> create() {
+        List<Level> a=new ArrayList<>();
+        a.add(new Builder("Punktelandung",
+                "Sammle mindestens 6 Punkte. Jedes Punkte-Item zählt nur einmal.",1100,6)
+                .point(270,FLOOR,1).point(595,FLOOR,5).point(860,FLOOR,1).build());
+
+        a.add(new Builder("Farbiges Tor",
+                "Eine starke Farbe öffnet das passende Tor. Punkte öffnen den Ausgang.",1380,6)
+                .switchColor(255,FLOOR,BLUE).point(385,FLOOR,1)
+                .gate(650,BOTH,BLUE).point(860,FLOOR,5)
+                .point(1130,FLOOR,1).build());
+
+        a.add(new Builder("Oben oder unten?",
+                "Am Bodenschalter geht es zur Decke. Überspringen führt unten weiter.",1780,10)
+                .point(250,FLOOR,1)
+                .branch(440,false,false,true,0).build());
+
+        a.add(new Builder("Zwei Spuren",
+                "Beide Wege haben eigene Farb-Items und Tore.",2050,10)
+                .point(250,FLOOR,1)
+                .branch(500,true,false,true,1).build());
+
+        a.add(new Builder("Der doppelte Weg",
+                "Entscheide bei jeder Abzweigung neu; Sammelwege lohnen sich.",3000,18)
+                .point(240,FLOOR,1)
+                .branch(370,true,false,true,2)
+                .branch(1580,true,false,false,3).build());
+
+        a.add(new Builder("Schlucht und Steg",
+                "Ein Sprung über die Schlucht erreicht zusätzliche Punkte.",3230,21)
+                .point(245,FLOOR,1)
+                .branch(370,true,false,true,4)
+                .branch(1640,true,true,false,5).build());
+
+        a.add(new Builder("Drei Entscheidungen",
+                "Sichere Wege sind möglich, aber nicht immer punktreich.",4100,28)
+                .point(240,FLOOR,1)
+                .branch(355,true,false,false,6)
+                .branch(1540,true,false,true,7)
+                .branch(2725,true,true,true,8).build());
+
+        a.add(new Builder("Umkehrpunkte",
+                "Nutze die unveränderten Schalter, um fehlende Punkte nachzuholen.",4390,30)
+                .point(235,FLOOR,1)
+                .branch(350,true,true,true,9)
+                .branch(1625,true,false,false,10)
+                .branch(2890,true,true,true,11).build());
+
+        a.add(new Builder("Vier Routen",
+                "Verschiedene Wege liefern verschieden viele Punkte.",5490,37)
+                .point(245,FLOOR,1)
+                .branch(350,true,false,true,12)
+                .branch(1590,true,true,false,13)
+                .branch(2840,true,false,true,14)
+                .branch(4100,true,true,false,15).build());
+
+        a.add(new Builder("Der große Irrgarten",
+                "Erkunde die Wege, wähle deine Farben und erreiche 42 Punkte.",6030,42)
+                .point(245,FLOOR,1)
+                .branch(350,true,true,false,16)
+                .branch(1720,true,false,true,17)
+                .branch(3070,true,true,false,18)
+                .branch(4430,true,true,true,19).build());
+
+        return Collections.unmodifiableList(a);
     }
-    private LevelData() {}
+    private LevelData(){}
 }
