@@ -12,6 +12,25 @@ public final class LevelRouteTest {
     private static void require(boolean ok,String text){if(!ok)throw new AssertionError(text);}
     private static int col(float x){return (int)Math.floor(x/LevelData.TILE);}
     private static int row(float y){return (int)Math.floor(y/LevelData.TILE);}
+    private static boolean close(float a,float b){return Math.abs(a-b)<0.01f;}
+    private static float roomFloor(int lane){return (6+5*lane)*LevelData.TILE;}
+    private static float roomCeiling(int lane){
+        return lane==0?2*LevelData.TILE:roomFloor(lane-1)+LevelData.DIVIDER_THICKNESS;
+    }
+    private static boolean gateSealsFullRoom(float top,float bottom,LevelData.Level level){
+        for(int lane=0;lane<level.stories;lane++)
+            if(close(top,roomCeiling(lane)) && close(bottom,roomFloor(lane)))return true;
+        return false;
+    }
+    private static boolean inWalkableArea(boolean[][] open,LevelData.Level w,int c,int r,float y){
+        if(open[r][c])return true;
+        // A shared floor/ceiling occupies only 19 units of a 58-unit
+        // tile; the space below its underside is physically open.
+        if(r>=6 && (r-6)%5==0 && y>=r*LevelData.TILE+LevelData.DIVIDER_THICKNESS){
+            return r+1<w.rows && open[r+1][c];
+        }
+        return false;
+    }
     private static boolean[][] reachable(LevelData.Level level){
         boolean[][] seen=new boolean[level.rows][level.columns];
         Queue<int[]> queue=new ArrayDeque<>();
@@ -40,6 +59,10 @@ public final class LevelRouteTest {
             "Later levels should include warned lethal pits "+i);
         for(LevelData.Shaft s:w.shafts){
             require(s.x2>s.x1 && s.bottom>s.top,"Malformed shaft "+i);
+            require(close(s.bottom-s.top,LevelData.DIVIDER_THICKNESS),
+                    "Shaft is thicker than the shared divider in level "+i);
+            require(close(s.x2-s.x1,3f*LevelData.TILE),
+                    "Shaft width is not the compact 3-tile opening in level "+i);
             require(s.x1>2*LevelData.TILE && s.x2<(w.columns-2)*LevelData.TILE,
                 "Shaft intersects outer wall "+i);
             int a=col(s.x1+2),b=col(s.x2-2),r=row(s.top+2);
@@ -50,16 +73,23 @@ public final class LevelRouteTest {
         }
         boolean[][] open=reachable(w);
         require(open[row(w.exitY)][col(w.exitX)],"Exit not connected in tile maze "+i);
+        for(LevelData.Gate gate:w.gates){
+            require(gateSealsFullRoom(gate.top,gate.bottom,w),
+                    "Colored gate can be jumped over in level "+i+" at "+gate.x);
+        }
         for(LevelData.ScoreGate gate:w.scoreGates){
             require(gate.threshold>0 && gate.threshold<=w.pointsAvailable(),
                     "Inter-room point gate requires unobtainable points at "+i);
+            require(gateSealsFullRoom(gate.top,gate.bottom,w),
+                    "Point door can be jumped over in level "+i+" at "+gate.x);
         }
         int fills=0,drains=0,stairs=0;
         int all=0,ones=0,fives=0,tens=0;
         for(LevelData.Item item:w.items){
             int c=col(item.x),r=row(item.y);
             require(c>=0&&r>=0&&c<w.columns&&r<w.rows,"Item outside map "+i);
-            require(open[r][c],"Item unreachable in tile geometry "+i+" at "+c+","+r);
+            require(inWalkableArea(open,w,c,r,item.y),
+                    "Item unreachable in physical thin-tile geometry "+i+" at "+c+","+r);
             if(item.type==LevelData.HELIUM_FILL){
                 fills++;
                 require(item.value>=6 && item.value<=7*(w.stories-1),
@@ -85,11 +115,16 @@ public final class LevelRouteTest {
         if(i>=4)require(tens>=w.stories,"Advanced stages require optional ten-pointers "+i);
         int[][] count=new int[w.rows][w.columns];
         for(LevelData.Shaft s:w.shafts){
-            int lane=(row(s.top+1)-6)/6;
+            int lane=(row(s.top+1)-6)/5;
             if(lane>=0&&lane<w.stories-1 && s.safe)count[lane][0]++;
         }
         if(i>=4)for(int lane=0;lane<w.stories-1;lane++)
             require(count[lane][0]>=2,"Non-branching floor "+lane+" in stage "+i);
+        for(int lane=1;lane<w.stories;lane++){
+            require(close(roomCeiling(lane)-roomFloor(lane-1),
+                    LevelData.DIVIDER_THICKNESS),
+                    "Storey has a hidden thick gap in level "+i);
+        }
         System.out.println("Stage "+i+" | "+w.columns+" x "+w.rows+
             " tiles | "+w.stories+" floors | safe shafts "+w.shafts.stream().filter(s->s.safe).count()+
             " | lethal pits "+w.shafts.stream().filter(s->!s.safe).count()+
