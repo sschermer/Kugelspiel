@@ -17,7 +17,8 @@ public final class LevelRouteTest {
         Queue<int[]> queue=new ArrayDeque<>();
         queue.add(new int[]{col(level.startX),row(level.startY)});
         while(!queue.isEmpty()){
-            int[] n=queue.remove(),x=n[0],r=n[1];
+            int[] n=queue.remove();
+            int x=n[0],r=n[1];
             if(x<0||r<0||x>=level.columns||r>=level.rows||
                 seen[r][x]||level.solid(x,r))continue;
             seen[r][x]=true;
