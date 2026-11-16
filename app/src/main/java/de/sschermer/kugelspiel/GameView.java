@@ -89,7 +89,7 @@ final class GameView extends View {
         float oldX=x;
         x+=vx*dt;
         for(LevelData.Gate gate:world().gates) {
-            if(!gate.blocks(color,gravity))continue;
+            if(gate.color==color)continue;
             float upper=gateTop(gate),lower=gateBottom(gate);
             if(y+R<=upper || y-R>=lower)continue;
             float edgeLeft=gate.x-GATE_HALF-R;
@@ -223,7 +223,7 @@ final class GameView extends View {
     }
     private void drawGate(Canvas c,LevelData.Gate gate) {
         float top=gateTop(gate),bottom=gateBottom(gate),gx=gate.x;
-        boolean open=!gate.blocks(color,gravity);
+        boolean open=gate.color==color;
         p.setShader(new LinearGradient(gx-GATE_HALF,0,gx+GATE_HALF,0,
                 colorBright(gate.color),colorDark(gate.color),Shader.TileMode.CLAMP));
         p.setAlpha(open?63:235);
