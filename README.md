@@ -1,46 +1,52 @@
 # Kugelspiel
 
-Native Android puzzle-platformer — **Iteration 007 / version 0.7.0**.
+Eigenständiger nativer Android-2D-Puzzle-Platformer, **Iteration 008 / Version 0.8.0**.
 
-## Individually designed worlds, not repeated templates
+## Produktregeln
 
-Stages 1–3 remain tutorials. **Stages 4–6 now come from individual level-design methods** rather than the regular stage generator.
+Drei Spieltasten: links, rechts, springen. Metallische Kugel mit leichter Trägheit und Kamera-Scrollen in beiden Achsen. Wiederverwendbare Farb- und Gravitations-Items. Die Farb-Sperrwände reichen lückenlos vom Boden bis zur Decke. Ein passendes Farb-Item lässt sie passieren.
 
-| Stage | Concept | Map |
+**NEU: Ein Level ist erst beendet, wenn jede einzelne Punktmarke (1/5/10) eingesammelt wurde.** Der Level-Exit besitzt keine niedrigere Punktschwelle mehr. Er zeigt `NOCH X MARKEN` und dann `OFFEN`. Das HUD zeigt eingesammelte/gesamte Marken sowie den zugehörigen Punktestand. Einzelne Marken bleiben nach Einsammeln sichtbar, wechseln von schwarz/weiß zu halbtransparent weiß/schwarz und zählen nur einmal. Punktetüren innerhalb der Welten können weiterhin Mindestpunktzahlen verlangen, ohne Punkte zu verbrauchen.
+
+**NEU: Normale Öffnungen sind in beide Richtungen durchlässig** (sofern die Kugel die Öffnung mit Sprüngen, umgekehrter Gravitation oder Helium erreichen kann). Der Spieler sieht an den Kanten nur dezentes Türkis, ohne Text oder Pfeile. Tödliche Spalten sind rot mit Zacken, ebenfalls ohne Text. Es gibt derzeit **keine** Einbahnöffnung; eine spätere Einbahnmechanik müsste bewusst separat entwickelt und anders gekennzeichnet werden.
+
+## Individuelle Level statt wiederholter Etagenvorlagen
+
+| Level | Aufbau | Rätselidee |
 |---|---|---|
-| 4: Verzweigte Höhlen | Loops, broad cave collapses, orange and blue color paths, rock obstacles and an optional 16-point chamber | 3 storeys, 56 tiles wide, 8 independently placed vertical openings, 29 points required |
-| 5: Der Sprungturm | Vertical exploration, a missing stair, 10-point bonus platforms, 18-point door, optional helium travel | 4 storeys, 66 tiles wide, multiple offset passage openings, 36 points required |
-| 6: Zwei Welten | Two separate horizontal regions, 28-point interdoors on all four floors; return to the left exit after collecting right-side points | 4 storeys, 78 tiles wide, 48-point exit, optional helium and a lethal pit |
+| 1 | Kurzer Einstieg | Alle Marken einsammeln |
+| 2 | Eine Farbbarriere | Farbwechsel und Vollständigkeit |
+| 3 | Zwei Ebenen | Auf- und Abstieg, erste Gravitationswechsel |
+| 4 – Die Höhlengabelung | Kompakte Höhlenschleifen auf 3 Ebenen | Farbpfade, Einsturzöffnungen, Sammelstellen auf Vorsprüngen |
+| 5 – Das Treppenwerk | 4 Ebenen, absichtlich fehlende Stufen | Sprungketten und 18-Punkte-Zwischentür |
+| 6 – Die zwei Reiche | 4 Ebenen, getrennter rechter und linker Bereich | 20-Punkte-Zwischentüren auf allen Etagen, später Rückweg zum Ausgang |
+| 7 – Die Umkehrkammer | 4 Ebenen, lange tödliche Bodenunterbrechung | **Gravitation nach oben ist die vorgesehene Lösung** zur sicheren Deckenquerung; Rückschalter hinter der Gefahr |
+| 8 – Die Heliumfabrik | 5 Ebenen, geschlossener vertikaler Doppelschacht | **Helium ist für die Punktmarke oben im Schacht vorgesehen und baulich nötig**, weil es dort keine Zwischenlandefläche gibt |
+| 9 – Die Schlüsselfarben | 5 Ebenen, drei verschiedene Farbschlüssel | Farbkombinationen, Rückwege, Punkte-Zwischentür, ohne unnötige Spezialmechanik |
+| 10 – Das Resonanzlabyrinth | 6 Ebenen, zwei voneinander getrennte Sonderpassagen | Gravitation über einen langen gefährlichen Boden und Helium in einem zweiten, mehrstöckigen Schacht |
 
-The three worlds contain genuine full-height rock blocks as well as intermediate functional platforms. Each has **hand-placed galleries with sections of the intermediate floor missing**. These large turquoise-marked safe openings are a different width from the normal three-tile connectors. The stage structure is driven by its puzzle, not by uniform item spacing.
+Alle Level ab 4 haben **eigene, ausdrücklich entworfene Grundrisse** und sind deutlich kompakter als die früheren gestreckten Karten. Die ersten Welten haben 44, 49 und 53 Spalten; die größten späteren Karten 72 statt 125. Funktionale Elemente, Felsen, Plattformen, Stufen, Schlitze und Kreuzungen sind eng genug verteilt, um ereignislose Laufstrecken zu begrenzen. Manche Zwischenebenen sind vollständig unterbrochen.
 
-Stages 7–10 deliberately retain their existing layouts while stages 4–6 undergo device playtesting. They will be redesigned after this design direction has been tested.
+**Spezialmechaniken nur, wenn sie eine Aufgabe erfüllen:**
+- In Level 4–6 und 9 kommen weder Helium- noch Gravitations-Items vor.
+- In Level 7 und 10 führt umgekehrte Gravitation über eine sonst tödliche, durchgehende breite Bodengefahr zu einer Decken-Punktmarke und anschließend zu einem Rückschalter.
+- In Level 8 und 10 ermöglichen gezielt platzierte HE+/HE−-Apparaturen den Aufstieg durch baulich abgeschlossene vertikale Schächte. Die Dächer und Wände verhindern gewöhnliches Betreten, Zwischenlandeflächen fehlen und ein 250-%-Stapelsprung kann die zwei Ebenen nicht auf einmal überwinden.
+- Ein versehentlich aktivierter Gravitationszustand kann dank jeweils vorhandener Gegenstation rückgängig gemacht werden; Apparaturen bleiben wiederverwendbar.
 
-## Geometry and mechanics
+Die Ballphysik mit normalem Hüpfer und stapelbaren Sprüngen (100/150/200/250 % Höhe) bleibt erhalten. Weitere Kettensprünge bei 250 % sind erlaubt, ein Deckenkontakt setzt die Sprungkraft sofort auf 100 % zurück.
 
-- Shared floor/ceiling dividers have **19 units** of actual collision and visual thickness.
-- Safe passages are turquoise with an arrow and the word DURCHGANG; lethal pits are dark red with spikes and the word GEFAHR.
-- All color gates and point interdoors reach from floor to ceiling and cannot be bypassed by stacked jumps.
-- Three simultaneous touch buttons: left, right and jump.
-- Metallic ball, reusable gravity switches, and clearly distinguished blue/orange/violet color pickups.
-- Jump height can stack from 100% to **150%, 200%, 250%**; unlimited further chains stay at 250%. Ceiling contact resets the boost to 100%.
-- Helium filling/draining sockets require centering and low speed. A filling socket can demand a minimum score.
-- Point tokens (1, 5, 10): black with a white number when available; translucent white with a black number when already collected. Points are awarded only once and are never spent.
-- Exits and intermediate doors show the number of missing points. Checkpoints and stage progress remain active.
-- Holding left and right together for 2.5 seconds resets the current stage.
+## Testsystem
 
-Saved progress remains on the same stage key as in Iteration 005, so it is not intentionally reset.
+GitHub Actions verwendet Java 17, Gradle 8.10.2 und Android SDK 35. Vor dem Android-Build laufen die Java-Tests der Karten- und Hüpferlogik. Die Karten-Tests überprüfen: Punkte-Gesamtsumme = Exit-Ziel, Anzahl der Sammelmarken, dünne Durchgangsgeometrie, vollständige Sperrwände, Gate-Voraussetzungen, bauliche Schachtbarrieren, zu jedem Spezialmechanismus vorhandene Gegenstationen und keine langen völlig ereignislosen Korridore.
 
-## Building and testing
+**Grenze dieser Tests:** Es gibt noch keinen vollständigen physikbasierten Spiel-Durchlauf. Insbesondere schwierige Wege zu allen Marken, das Timing der Helium-Apparaturen und mögliche Sackgassen müssen am Android-Gerät geprüft und gegebenenfalls korrigiert werden. Die Strukturprüfung ist keine Garantie, dass jeder Level tatsächlich komplett lösbar ist.
 
-Requirements: JDK 17, Gradle 8.10.2, Android SDK 35. GitHub Actions builds the artifact **kugelspiel-iteration-007-debug**. The workflow compiles the pure-Java level and jump tests, then packages a debug APK.
+Debug-Build per GitHub Actions und nach erfolgreichem Workflow als direkte Datei unter GitHub Releases (Vorabversion `v0.8.0-preview`).
 
-Source layout: LevelData.java (geometry), HandcraftedLevels.java (three individually designed stages), GameView.java (Android Canvas and controls), BounceChain.java (stacked jump rules), LevelRouteTest.java and BounceChainTest.java (structural tests).
+## Technische und rechtliche Angaben
 
-The tests check map dimensions, floor gaps, full-room gate heights, unique stage structure, score-gate requirements, and jump-state rules. **They do not simulate a complete real-device run and cannot guarantee that every route is feasible or free of softlocks.** Device playtesting is necessary.
+Die App-ID ist weiterhin `de.sschermer.kugelspiel`, `versionCode 8`. Für den Test dieser umfassend geänderten Karten startet ein eigener Level-Fortschritt unter `level_008`; ältere gespeicherte Fortschrittsdaten bleiben unabhängig davon im App-Speicher erhalten.
 
-## Public repo, rights and signing
+Alle Spielgrafiken sind selbst mit Android Canvas gezeichnet; es wurden keine unklar lizenzierten Fremdassets oder Audiodateien übernommen. Die Rechte am eigenen Code und an der Grafik bleiben bis zur ausdrücklichen Lizenzentscheidung vorbehalten. Ein öffentliches GitHub-Repository ist nicht automatisch Open Source. Weitere Angaben: `THIRD_PARTY_NOTICES.md`.
 
-No external game artwork or audio was added. Original Canvas graphics are created in code. All project code and artwork remain owner-controlled with no reuse license selected. Public repository visibility does not grant reuse rights; consult THIRD_PARTY_NOTICES.md.
-
-App ID remains de.sschermer.kugelspiel, versionCode 7. GitHub Actions debug signing may differ between builds, so updates might require removing an older debug APK. Persistent signing keys must not be committed to the public repository.
+Die Debug-Signierung wechselt zwischen GitHub-Actions-Builds. Falls ein Android-Update nicht installiert werden kann, kann eine Deinstallation der vorherigen Testversion erforderlich sein; dabei können lokale Daten verloren gehen. Ein beständiger privater Signierschlüssel darf nie ins öffentliche Repository.
