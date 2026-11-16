@@ -1,122 +1,92 @@
 package de.sschermer.kugelspiel;
 
-import java.util.List;
+import java.util.ArrayDeque;
+import java.util.Queue;
 
 /**
- * Deterministic design checks. The solver enumerates one-path-per-branch
- * combinations; it does not simulate Android touch input or precise physics.
+ * Static safety checks for a physical map, run in CI before Android compilation.
+ * Flood fill checks walkable void connectivity; it does not claim to simulate
+ * gravity, player timing, or whether the game is enjoyable on a phone.
  */
 public final class LevelRouteTest {
-    private static void require(boolean condition,String problem) {
-        if(!condition)throw new AssertionError(problem);
-    }
-    private static boolean near(float a,float b){return Math.abs(a-b)<0.15f;}
-
-    private static LevelData.Item item(LevelData.Level level,int type,int lane,float x) {
-        for(LevelData.Item i:level.items) {
-            if(i.type==type && i.lane==lane && near(i.x,x))return i;
+    private static void require(boolean ok,String text){if(!ok)throw new AssertionError(text);}
+    private static int col(float x){return (int)Math.floor(x/LevelData.TILE);}
+    private static int row(float y){return (int)Math.floor(y/LevelData.TILE);}
+    private static boolean[][] reachable(LevelData.Level level){
+        boolean[][] seen=new boolean[level.rows][level.columns];
+        Queue<int[]> queue=new ArrayDeque<>();
+        queue.add(new int[]{col(level.startX),row(level.startY)});
+        while(!queue.isEmpty()){
+            int[] n=queue.remove(),x=n[0],r=n[1];
+            if(x<0||r<0||x>=level.columns||r>=level.rows||
+                seen[r][x]||level.solid(x,r))continue;
+            seen[r][x]=true;
+            queue.add(new int[]{x+1,r});queue.add(new int[]{x-1,r});
+            queue.add(new int[]{x,r+1});queue.add(new int[]{x,r-1});
         }
-        throw new AssertionError(level.name+": item missing at "+x);
+        return seen;
     }
-    private static LevelData.Gate gate(LevelData.Level level,int lane,float x) {
-        for(LevelData.Gate g:level.gates) {
-            if(g.lane==lane&&near(g.x,x))return g;
-        }
-        throw new AssertionError(level.name+": gate missing at "+x);
-    }
-    private static void structural(LevelData.Level lvl,int number) {
-        require(lvl.finish>900,"Level "+number+": too short");
-        require(lvl.availablePoints()>=lvl.target,
-                "Level "+number+": cannot collect sufficient points");
-        require(lvl.target>0,"Level "+number+": target must be positive");
-        for(LevelData.Item i:lvl.items) {
-            require(i.x>130 && i.x<lvl.finish-90,
-                    "Level "+number+": inaccessible item at "+i.x);
-            if(i.once())require(i.value==1||i.value==5||i.value==10,
-                    "Level "+number+": point denomination");
-        }
-        for(LevelData.Gate g:lvl.gates)
-            require(g.x>150&&g.x<lvl.finish-70,"Level "+number+": gate outside bounds");
-        for(LevelData.Segment gap:lvl.gaps)
-            require(gap.to-gap.from<=85 && gap.to>gap.from,
-                    "Level "+number+": too large/invalid gap");
-        for(LevelData.Branch b:lvl.branches) {
-            require(b.lower!=b.upper,"Level "+number+": different path scores required");
-            require(b.x+1020<lvl.finish,"Level "+number+": branch not inside world");
-            require(item(lvl,LevelData.GRAVITY,LevelData.FLOOR,b.x+95).value==LevelData.UP,
-                    "Upper path entry missing");
-            require(item(lvl,LevelData.GRAVITY,LevelData.CEILING,b.x+705).value==LevelData.DOWN,
-                    "Upper path rejoin missing");
-            require(item(lvl,LevelData.POINT,LevelData.FLOOR,b.x+475).value==b.lower,
-                    "Lower branch reward wrong");
-            require(item(lvl,LevelData.POINT,LevelData.CEILING,b.x+485).value==b.upper,
-                    "Upper branch reward wrong");
-            require(item(lvl,LevelData.POINT,LevelData.FLOOR,b.x+992).value==1,
-                    "Branch reunion reward missing");
-            require(lvl.checkpoints.stream().anyMatch(x->near(x,b.x+915)),
-                    "Branch checkpoint missing");
-            if(b.gated) {
-                int floorColor=item(lvl,LevelData.COLOR,LevelData.FLOOR,b.x+310).value;
-                int roofColor=item(lvl,LevelData.COLOR,LevelData.CEILING,b.x+390).value;
-                require(gate(lvl,LevelData.FLOOR,b.x+610).color==floorColor,
-                        "Lower route gate has no matching item");
-                require(gate(lvl,LevelData.CEILING,b.x+610).color==roofColor,
-                        "Upper route gate has no matching item");
-            }
-            if(b.challenging){
-                require(lvl.gaps.stream().anyMatch(g->near(g.from,b.x+548)),
-                        "Expected small jump gap");
-                require(lvl.ledges.stream().anyMatch(g->near(g.from,b.x+496)),
-                        "Optional ledge missing");
-                require(item(lvl,LevelData.POINT,LevelData.MID,b.x+605).value==5,
-                        "Optional skill reward missing");
-                require(lvl.spikes.stream().anyMatch(h->near(h.x,b.x+778)),
-                        "Expected mild spike hazard");
+    private static void check(LevelData.Level w,int i){
+        require(w.columns>=25 && w.rows>=10,"Dimensions "+i);
+        require(w.pointsAvailable()>=w.target,"Target exceeds available points "+i);
+        require(w.target>0,"Target is zero "+i);
+        require(w.items.size()>=w.stories*3,"Sparse item distribution "+i);
+        require(w.shafts.stream().filter(s->s.safe).count()>=(w.stories-1),
+            "Missing main floor connectors "+i);
+        if(i>=4)require(w.shafts.stream().filter(s->s.safe).count()>=(w.stories-1)*2,
+            "Advanced maze must offer alternate routes "+i);
+        if(i>=6)require(w.shafts.stream().anyMatch(s->!s.safe),
+            "Later levels should include warned lethal pits "+i);
+        for(LevelData.Shaft s:w.shafts){
+            require(s.x2>s.x1 && s.bottom>s.top,"Malformed shaft "+i);
+            require(s.x1>2*LevelData.TILE && s.x2<(w.columns-2)*LevelData.TILE,
+                "Shaft intersects outer wall "+i);
+            int a=col(s.x1+2),b=col(s.x2-2),r=row(s.top+2);
+            for(int c=a;c<=b;c++){
+                require(!w.solid(c,r),"Shaft floor blocked at "+i);
+                if(s.safe)require(!w.solid(c,r+1),"Safe shaft ceiling blocked at "+i);
             }
         }
-    }
-    private static void scoreRoutes(LevelData.Level lvl,int number) {
-        List<LevelData.Branch> branches=lvl.branches;
-        if(branches.isEmpty()){
-            require(lvl.availablePoints()>=lvl.target,"Intro route cannot score enough");
-            System.out.println("Level "+number+": "+lvl.name+" | intro score "
-                    +lvl.availablePoints()+"/"+lvl.target);
-            return;
-        }
-        int paths=1<<branches.size(),feasible=0,min=Integer.MAX_VALUE,max=0;
-        for(int mask=0;mask<paths;mask++){
-            // One starting +1 and one reunion +1 per branch.
-            int points=1+branches.size();
-            for(int b=0;b<branches.size();b++){
-                LevelData.Branch branch=branches.get(b);
-                points+=((mask&(1<<b))!=0)?branch.upper:branch.lower;
+        boolean[][] open=reachable(w);
+        require(open[row(w.exitY)][col(w.exitX)],"Exit not connected in tile maze "+i);
+        int all=0,ones=0,fives=0,tens=0;
+        for(LevelData.Item item:w.items){
+            int c=col(item.x),r=row(item.y);
+            require(c>=0&&r>=0&&c<w.columns&&r<w.rows,"Item outside map "+i);
+            require(open[r][c],"Item unreachable in tile geometry "+i+" at "+c+","+r);
+            if(item.type==LevelData.POINT){
+                require(item.value==1||item.value==5||item.value==10,
+                    "Invalid score item "+i);
+                all+=item.value;
+                if(item.value==1)ones++;
+                if(item.value==5)fives++;
+                if(item.value==10)tens++;
             }
-            min=Math.min(min,points);max=Math.max(max,points);
-            if(points>=lvl.target)feasible++;
         }
-        require(max>=lvl.target,
-                "Level "+number+": threshold unreachable without optional risky tokens: max="+max);
-        require(min<lvl.target,
-                "Level "+number+": point choices are inconsequential: min="+min);
-        if(number>=5)require(feasible>=2,
-                "Level "+number+": multiple viable point routes required");
-        System.out.println("Level "+number+": "+lvl.name
-                +" | "+feasible+"/"+paths+" simple routes open exit"
-                +" | score "+min+".."+max+" / "+lvl.target
-                +" | optional tokens: "+(lvl.availablePoints()-1-branches.size()*16));
+        require(all>=w.target && ones>0 && fives>0,"Point distribution insufficient "+i);
+        if(i>=4)require(tens>=w.stories,"Advanced stages require optional ten-pointers "+i);
+        int[][] count=new int[w.rows][w.columns];
+        for(LevelData.Shaft s:w.shafts){
+            int lane=(row(s.top+1)-6)/6;
+            if(lane>=0&&lane<w.stories-1 && s.safe)count[lane][0]++;
+        }
+        if(i>=4)for(int lane=0;lane<w.stories-1;lane++)
+            require(count[lane][0]>=2,"Non-branching floor "+lane+" in stage "+i);
+        System.out.println("Stage "+i+" | "+w.columns+" x "+w.rows+
+            " tiles | "+w.stories+" floors | safe shafts "+w.shafts.stream().filter(s->s.safe).count()+
+            " | lethal pits "+w.shafts.stream().filter(s->!s.safe).count()+
+            " | available "+all+" / required "+w.target);
     }
-
-    public static void main(String[] args) {
-        require(LevelData.LEVELS.size()==10,"Expected 10 curated levels");
-        float prev=0;int previousBranches=-1;
-        for(int i=0;i<LevelData.LEVELS.size();i++) {
-            LevelData.Level lvl=LevelData.LEVELS.get(i);
-            require(lvl.finish>prev,"Levels must grow steadily in horizontal length");
-            require(lvl.branches.size()>=previousBranches,"Branch count must not decrease");
-            structural(lvl,i+1);
-            scoreRoutes(lvl,i+1);
-            prev=lvl.finish;previousBranches=lvl.branches.size();
+    public static void main(String[] args){
+        require(LevelData.LEVELS.size()==10,"10 levels required");
+        int previousWidth=0,previousStories=0;
+        for(int i=0;i<10;i++){
+            LevelData.Level w=LevelData.LEVELS.get(i);
+            require(w.columns>previousWidth,"Levels must increase in width");
+            require(w.stories>=previousStories,"Levels must not shrink vertically");
+            if(i>=3)require(w.stories>=3,"No real labyrinth after tutorial");
+            check(w,i+1);previousWidth=w.columns;previousStories=w.stories;
         }
-        System.out.println("All ten levels pass geometry and score-route design checks.");
+        System.out.println("All structural maze checks passed. Device playtesting still required.");
     }
 }
