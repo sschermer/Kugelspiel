@@ -5,21 +5,21 @@ import java.util.HashMap;
 /**
  * Invisible two-half touch control.
  *
- * Every FIRST finger of a new gesture starts a guaranteed 200ms horizontal
+ * Every FIRST finger of a new gesture starts a guaranteed 100ms horizontal
  * movement lock. No velocity or ground-contact flags may bypass it.
  *
- * A second finger on the opposite half within 200ms produces a straight-up
+ * A second finger on the opposite half within 100ms produces a straight-up
  * jump and keeps horizontal motion frozen while the initial pair remains.
- * Releasing either finger starts a separate 200ms lock, then the remaining
+ * Releasing either finger starts a separate 100ms lock, then the remaining
  * finger accelerates in its half's direction, including in midair.
  *
- * If the second finger arrives after 200ms, the first finger is already
+ * If the second finger arrives after 100ms, the first finger is already
  * steering and the new jump must NOT brake or stop horizontal movement.
  */
 final class HalfScreenControls {
     static final int LEFT=1,RIGHT=2;
-    static final long START_DELAY_MS=200L;
-    static final long AFTER_VERTICAL_RELEASE_DELAY_MS=200L;
+    static final long START_DELAY_MS=100L;
+    static final long AFTER_VERTICAL_RELEASE_DELAY_MS=100L;
     private static final long RETAP_WINDOW_MS=260L;
 
     private final HashMap<Integer,Integer> sides=new HashMap<>();
