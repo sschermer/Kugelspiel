@@ -12,561 +12,478 @@ import android.graphics.Typeface;
 import android.view.MotionEvent;
 import android.view.View;
 
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Locale;
 
-/**
- * Iteration 003: a side-scrolling, score-gated, branching platform puzzle.
- * Canvas artwork is drawn at runtime; no external images or libraries.
- */
+/** Native Canvas renderer and platform physics for layered tile mazes. */
 final class GameView extends View {
-    private static final float FLOOR=LevelData.BOTTOM, CEILING=LevelData.TOP;
-    private static final float R=22f, GATE_HALF=15f, G=1150f;
-    private static final float JUMP_SPEED=566f, MAX_SPEED=318f, STEP=1f/120f;
-    private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final HashSet<Integer> left=new HashSet<>(), right=new HashSet<>(), jump=new HashSet<>();
+    private static final float TILE=LevelData.TILE, R=15f, G=950f;
+    private static final float JUMP=490f, SPEED=266f, STEP=1f/120f;
+    private final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final HashSet<Integer> left=new HashSet<>(),right=new HashSet<>(),jump=new HashSet<>();
     private final android.content.SharedPreferences prefs;
-
-    private float x,y,vx,vy,camX,camY,scale=1f;
-    private float jumpBuffer,coyote,toastTime,titleTime,goalToastCooldown,restartHold,finishTime;
-    private int gravity=LevelData.DOWN,color=LevelData.NONE,level=0;
-    private int score=0, checkpointScore=0;
-    private float respawnX=110;
-    private int respawnColor=LevelData.NONE, respawnGravity=LevelData.DOWN;
-    private boolean onSurface=true,paused=false,complete=false,checkpointActive=false;
-    private boolean[] collected=new boolean[0], savedCollected=new boolean[0];
-    private boolean[] checkpointUsed=new boolean[0], savedCheckpoints=new boolean[0];
-    private String toast="";
-    private long last=System.nanoTime();
+    private float x,y,vx,vy,camX,camY,scale=1,lastDt=0;
+    private float jumpBuffer,coyote,tipTime,messageTime,exitWarning,finishDelay,resetHold;
+    private float checkpointX,checkpointY;
+    private int checkpointColor,checkpointGravity,checkpointScore;
+    private int color=LevelData.NONE,gravity=LevelData.DOWN,score=0,level=0;
+    private boolean surface=true,paused=false,complete=false,hasCheckpoint=false;
+    private boolean[] collected=new boolean[0],snapshot=new boolean[0];
+    private String message="";
+    long last=System.nanoTime();
 
     GameView(Context context) {
         super(context);
         prefs=context.getSharedPreferences("kugelspiel_progress",Context.MODE_PRIVATE);
-        level=Math.max(0,Math.min(LevelData.LEVELS.size()-1,prefs.getInt("level_003",0)));
-        beginLevel(false);
+        level=Math.max(0,Math.min(9,prefs.getInt("level_004",0)));
+        begin(false);
         setFocusable(true);
     }
-
-    private LevelData.Level data(){return LevelData.LEVELS.get(level);}
-    void setPaused(boolean value) {
-        paused=value; last=System.nanoTime();
-        if(value){left.clear();right.clear();jump.clear();restartHold=0;}
+    private LevelData.Level world(){return LevelData.LEVELS.get(level);}
+    void setPaused(boolean pause) {
+        paused=pause;last=System.nanoTime();
+        if(pause){left.clear();right.clear();jump.clear();resetHold=0;}
     }
-    private void beginLevel(boolean fromFirst) {
-        if(fromFirst)level=0;
-        score=0;checkpointScore=0;color=LevelData.NONE;gravity=LevelData.DOWN;
-        respawnX=110;respawnColor=color;respawnGravity=gravity;
-        collected=new boolean[data().items.size()];
-        savedCollected=collected.clone();
-        checkpointUsed=new boolean[data().checkpoints.size()];
-        savedCheckpoints=checkpointUsed.clone();
-        checkpointActive=false;
-        x=110;y=FLOOR-R;vx=vy=0;onSurface=true;
-        jumpBuffer=0;coyote=.13f;finishTime=0;restartHold=0;
-        complete=false;titleTime=3;goalToastCooldown=0;toastTime=0;
-        camX=-90;camY=0;
+    private void begin(boolean first) {
+        if(first)level=0;
+        LevelData.Level w=world();
+        x=w.startX;y=w.startY;vx=vy=0;gravity=LevelData.DOWN;color=LevelData.NONE;
+        score=0;hasCheckpoint=false;checkpointScore=0;
+        checkpointX=x;checkpointY=y;checkpointColor=color;checkpointGravity=gravity;
+        collected=new boolean[w.items.size()];snapshot=collected.clone();
+        surface=true;complete=false;finishDelay=0;resetHold=0;jumpBuffer=0;coyote=.14f;
+        tipTime=4.5f;messageTime=0;exitWarning=0;
+        camX=0;camY=0;
         left.clear();right.clear();jump.clear();
-        prefs.edit().putInt("level_003",level).apply();
+        prefs.edit().putInt("level_004",level).apply();
     }
-    private void atCheckpoint(int i) {
-        if(checkpointUsed[i])return;
-        checkpointUsed[i]=true;respawnX=data().checkpoints.get(i)+25;
-        checkpointScore=score;respawnColor=color;respawnGravity=LevelData.DOWN;
-        savedCollected=collected.clone();savedCheckpoints=checkpointUsed.clone();
-        checkpointActive=true;message("Checkpoint gesichert");
+    private void msg(String t) {message=t;messageTime=1.65f;}
+    private void checkpoint(float px,float py) {
+        if(hasCheckpoint && Math.abs(checkpointX-px)<2)return;
+        hasCheckpoint=true;
+        checkpointX=px;checkpointY=py;
+        checkpointColor=color;checkpointGravity=gravity;checkpointScore=score;
+        snapshot=collected.clone();
+        msg("Checkpoint gespeichert");
     }
-    private void die() {
-        x=respawnX;y=FLOOR-R;vx=vy=0;
-        score=checkpointScore;color=respawnColor;gravity=respawnGravity;
-        collected=savedCollected.clone();
-        checkpointUsed=savedCheckpoints.clone();
-        onSurface=true;jumpBuffer=0;coyote=.13f;finishTime=0;
-        message(checkpointActive?"Zurück zum Checkpoint":"Zurück zum Start");
+    private void death() {
+        x=checkpointX;y=checkpointY;vx=vy=0;
+        gravity=checkpointGravity;color=checkpointColor;score=checkpointScore;
+        collected=snapshot.clone();surface=true;jumpBuffer=0;coyote=.14f;
+        msg(hasCheckpoint?"Zurück zum Checkpoint":"Zurück zum Start");
     }
-    private void message(String msg){toast=msg;toastTime=1.65f;}
-    private void finishLevel() {
-        int old=prefs.getInt("best_003_"+level,0);
-        if(score>old)prefs.edit().putInt("best_003_"+level,score).apply();
-        if(level==LevelData.LEVELS.size()-1){
-            complete=true;finishTime=0;message("Alle zehn Level geschafft!");
-        } else {
-            level++;beginLevel(false);
-        }
+    private void next() {
+        int old=prefs.getInt("best_004_"+level,0);
+        if(score>old)prefs.edit().putInt("best_004_"+level,score).apply();
+        if(level==9){complete=true;finishDelay=0;msg("Alle Labyrinthe geschafft!");}
+        else{level++;begin(false);}
     }
-    private static float clamp(float v,float low,float high) {return Math.max(low,Math.min(high,v));}
-    private boolean floorAt(float px) {
-        for(LevelData.Segment gap:data().gaps)
-            if(px>gap.from+R*.45f && px<gap.to-R*.45f)return false;
-        return true;
-    }
-    private float gateTop(LevelData.Gate g) {
-        return g.lane==LevelData.FLOOR ? FLOOR-184 : CEILING+4;
-    }
-    private float gateBottom(LevelData.Gate g) {
-        return g.lane==LevelData.CEILING ? CEILING+184 : FLOOR-4;
+    private static float clamp(float n,float low,float high){return Math.max(low,Math.min(high,n));}
+    private boolean touching(float ax,float ay,float bx,float by,float rad){
+        return (ax-bx)*(ax-bx)+(ay-by)*(ay-by)<rad*rad;
     }
 
-    private void tick(float dt) {
-        if(paused || complete)return;
-        if(finishTime>0) {
-            finishTime-=dt;if(finishTime<=0)finishLevel();return;
-        }
-        titleTime=Math.max(0,titleTime-dt);
-        toastTime=Math.max(0,toastTime-dt);
-        goalToastCooldown=Math.max(0,goalToastCooldown-dt);
-
-        if(!left.isEmpty()&&!right.isEmpty()) {
-            restartHold+=dt;
-            if(restartHold>=2.5f){beginLevel(false);message("Level neu gestartet");return;}
-        } else restartHold=0;
-
-        float direction=(right.isEmpty()?0:1)-(left.isEmpty()?0:1);
-        float accel=onSurface?1530f:930f;
-        if(direction!=0)vx+=direction*accel*dt;
-        else vx*=Math.max(0,1-(onSurface?9f:3f)*dt);
-        vx=clamp(vx,-MAX_SPEED,MAX_SPEED);
-
-        jumpBuffer=Math.max(0,jumpBuffer-dt);
-        if(onSurface)coyote=.14f;else coyote=Math.max(0,coyote-dt);
-        if(jumpBuffer>0 && coyote>0){
-            vy=-gravity*JUMP_SPEED;onSurface=false;coyote=0;jumpBuffer=0;
-        }
-        float oldX=x,oldY=y;
-        x+=vx*dt;
-        for(LevelData.Gate gate:data().gates) {
-            if(!gate.blocks(color))continue;
-            if(y+R<gateTop(gate)||y-R>gateBottom(gate))continue;
-            float leftEdge=gate.x-GATE_HALF-R,rightEdge=gate.x+GATE_HALF+R;
-            if(vx>0 && oldX<=leftEdge && x>leftEdge){x=leftEdge;vx=0;}
-            else if(vx<0 && oldX>=rightEdge && x<rightEdge){x=rightEdge;vx=0;}
-        }
-        x=clamp(x,R,data().finish+R);
-
-        vy=clamp(vy+gravity*G*dt,-940,940);
-        y+=vy*dt;
-        boolean standing=false;
-
-        // One-way metal shelves are traversable from below in normal gravity.
-        if(gravity==LevelData.DOWN && vy>=0) {
-            for(LevelData.Segment shelf:data().ledges) {
-                if(x+R<=shelf.from || x-R>=shelf.to)continue;
-                if(oldY+R<=shelf.y+5 && y+R>=shelf.y) {
-                    y=shelf.y-R;vy=0;standing=true;break;
-                }
-            }
-        } else if(gravity==LevelData.UP && vy<=0) {
-            for(LevelData.Segment shelf:data().ledges) {
-                if(x+R<=shelf.from || x-R>=shelf.to)continue;
-                float under=shelf.y+18;
-                if(oldY-R>=under-5 && y-R<=under) {
-                    y=under+R;vy=0;standing=true;break;
-                }
+    private void moveHorizontal(float d) {
+        if(Math.abs(d)<.0001f)return;
+        x+=d;
+        int leftCol=(int)Math.floor((x-R)/TILE),rightCol=(int)Math.floor((x+R)/TILE);
+        int upRow=(int)Math.floor((y-R)/TILE),lowRow=(int)Math.floor((y+R)/TILE);
+        for(int r=upRow;r<=lowRow;r++)for(int c=leftCol;c<=rightCol;c++) {
+            if(!world().solid(c,r))continue;
+            float a=c*TILE,b=(c+1)*TILE;
+            if(x+R>a && x-R<b && y+R>r*TILE && y-R<(r+1)*TILE) {
+                if(d>0)x=a-R;else x=b+R;
+                vx=0;
             }
         }
-        if(gravity==LevelData.DOWN && floorAt(x) && y>=FLOOR-R && oldY<=FLOOR+55) {
-            y=FLOOR-R;if(vy>0)vy=0;standing=true;
-        }
-        if(gravity==LevelData.UP && y<=CEILING+R) {
-            y=CEILING+R;if(vy<0)vy=0;standing=true;
-        }
-        // After gravity switches, never tunnel into a floor or ceiling.
-        if(gravity==LevelData.DOWN && y<CEILING+R)y=CEILING+R;
-        if(gravity==LevelData.UP && y>FLOOR-R && floorAt(x))y=FLOOR-R;
-        onSurface=standing;
-
-        // Persistent switches + single-award points.
-        for(int i=0;i<data().items.size();i++){
-            LevelData.Item item=data().items.get(i);
-            if(Math.hypot(x-item.x,y-item.y)>R+(item.type==LevelData.COLOR?39:34))continue;
-            if(item.type==LevelData.POINT){
-                if(!collected[i]){
-                    collected[i]=true;score+=item.value;message("+"+item.value+" Punkte");
-                }
-            } else if(item.type==LevelData.COLOR && color!=item.value) {
-                color=item.value;message("Farbe: "+colorName(color));
-            } else if(item.type==LevelData.GRAVITY && gravity!=item.value) {
-                gravity=item.value;onSurface=false;coyote=0;vy=0;
-                message("Schwerkraft: "+(gravity==LevelData.UP?"nach oben":"nach unten"));
+        for(LevelData.Gate gate:world().gates) {
+            if(gate.color==color)continue;
+            if(y+R<=gate.top || y-R>=gate.bottom)continue;
+            float a=gate.x-12,b=gate.x+12;
+            if(x+R>a&&x-R<b) {
+                if(d>0)x=a-R;else x=b+R;
+                vx=0;
             }
         }
-        for(int i=0;i<data().checkpoints.size();i++) {
-            // Secure checkpoints when the player reaches the floor after a route.
-            float cp=data().checkpoints.get(i);
-            if(!checkpointUsed[i] && x>cp && gravity==LevelData.DOWN && y>FLOOR-60)
-                atCheckpoint(i);
-        }
-        for(LevelData.Hazard spike:data().spikes){
-            if(Math.abs(x-spike.x)<R+19 && y+R>spike.base-32 && y-R<spike.base)
-            {die();return;}
-        }
-        if(y>FLOOR+230 || y<CEILING-200){die();return;}
-
-        if(x>=data().finish-29) {
-            if(score<data().target){
-                x=data().finish-30;if(vx>0)vx=0;
-                if(goalToastCooldown<=0){
-                    message("Noch "+(data().target-score)+" Punkte bis zum Ausgang!");
-                    goalToastCooldown=2f;
-                }
+    }
+    private void moveVertical(float d) {
+        surface=false;
+        y+=d;
+        int leftCol=(int)Math.floor((x-R)/TILE),rightCol=(int)Math.floor((x+R)/TILE);
+        int upRow=(int)Math.floor((y-R)/TILE),lowRow=(int)Math.floor((y+R)/TILE);
+        for(int r=upRow;r<=lowRow;r++)for(int c=leftCol;c<=rightCol;c++) {
+            if(!world().solid(c,r))continue;
+            float top=r*TILE,bottom=(r+1)*TILE,leftEdge=c*TILE,rightEdge=(c+1)*TILE;
+            if(x+R<=leftEdge||x-R>=rightEdge||y+R<=top||y-R>=bottom)continue;
+            if(d>=0) {
+                y=top-R;
+                if(gravity==LevelData.DOWN)surface=true;
             } else {
-                finishTime=.72f;vx=vy=0;message("Ausgang geöffnet!");
+                y=bottom+R;
+                if(gravity==LevelData.UP)surface=true;
+            }
+            vy=0;
+        }
+    }
+    private void tick(float dt) {
+        if(paused||complete)return;
+        if(finishDelay>0){finishDelay-=dt;if(finishDelay<=0)next();return;}
+        tipTime=Math.max(0,tipTime-dt);
+        messageTime=Math.max(0,messageTime-dt);
+        exitWarning=Math.max(0,exitWarning-dt);
+        if(!left.isEmpty()&&!right.isEmpty()){
+            resetHold+=dt;
+            if(resetHold>=2.5f){begin(false);msg("Level neu gestartet");return;}
+        }else resetHold=0;
+
+        int command=(right.isEmpty()?0:1)-(left.isEmpty()?0:1);
+        if(command!=0)vx+=command*(surface?1320f:860f)*dt;
+        else vx*=Math.max(0,1-(surface?10f:3f)*dt);
+        vx=clamp(vx,-SPEED,SPEED);
+        jumpBuffer=Math.max(0,jumpBuffer-dt);
+        if(surface)coyote=.15f; else coyote=Math.max(0,coyote-dt);
+        if(jumpBuffer>0&&coyote>0){
+            vy=-gravity*JUMP;surface=false;coyote=0;jumpBuffer=0;
+        }
+        moveHorizontal(vx*dt);
+        vy=clamp(vy+gravity*G*dt,-750,750);
+        moveVertical(vy*dt);
+        // Explicitly dangerous gaps are separate from turquoise traversal shafts.
+        for(LevelData.Shaft shaft:world().shafts) {
+            if(shaft.safe)continue;
+            if(x>shaft.x1+R*.35f&&x<shaft.x2-R*.35f&&
+                y+R>shaft.top+19&&y-R<shaft.bottom) {death();return;}
+        }
+        if(y>world().rows*TILE+80){death();return;}
+
+        for(int i=0;i<world().items.size();i++){
+            LevelData.Item item=world().items.get(i);
+            float rad=item.type==LevelData.COLOR?R+27:R+25;
+            if(!touching(x,y,item.x,item.y,rad))continue;
+            if(item.type==LevelData.POINT) {
+                if(!collected[i]){collected[i]=true;score+=item.value;msg("+"+item.value+" Punkte");}
+            }else if(item.type==LevelData.COLOR&&color!=item.value) {
+                color=item.value;msg("Farbe: "+colorName(color));
+            }else if(item.type==LevelData.GRAVITY&&gravity!=item.value) {
+                gravity=item.value;surface=false;coyote=0;vy=0;
+                msg(gravity==LevelData.UP?"Schwerkraft nach oben":"Schwerkraft nach unten");
+            }
+        }
+        for(float[] cp:world().checkpoints) {
+            if(touching(x,y,cp[0],cp[1],R+36) && (!hasCheckpoint||Math.abs(checkpointX-cp[0])>2)){
+                checkpoint(cp[0],cp[1]);
+            }
+        }
+        float ex=world().exitX,ey=world().exitY;
+        if(Math.abs(x-ex)<35 && Math.abs(y-ey)<115) {
+            if(score>=world().target){finishDelay=.8f;vx=vy=0;msg("Ausgang geöffnet!");}
+            else if(exitWarning<=0) {
+                msg("Noch "+(world().target-score)+" Punkte nötig");
+                exitWarning=2;
             }
         }
     }
 
-    @Override protected void onDraw(Canvas canvas){
-        super.onDraw(canvas);
-        if(getWidth()<=0||getHeight()<=0)return;
-        scale=Math.min(getWidth()/1130f,getHeight()/755f);
-        float ww=getWidth()/scale,hh=getHeight()/scale;
-        long now=System.nanoTime();
-        float elapsed=clamp((now-last)/1_000_000_000f,0,.04f);
-        last=now;
-        for(float remain=elapsed;remain>0;){
-            float delta=Math.min(STEP,remain);tick(delta);remain-=delta;
-        }
-        float targetX=clamp(x-ww*.46f,-85f,Math.max(-85f,data().finish+115-ww));
-        float targetY=clamp(y-hh*.58f,-35f,Math.max(-35f,FLOOR+175-hh));
-        camX+=(targetX-camX)*Math.min(1,elapsed*6.5f);
-        camY+=(targetY-camY)*Math.min(1,elapsed*4f);
-
-        canvas.save();canvas.scale(scale,scale);
-        background(canvas,ww,hh);
-        canvas.save();canvas.translate(-camX,-camY);
-        drawGround(canvas);
-        for(LevelData.Segment shelf:data().ledges)drawShelf(canvas,shelf);
-        for(LevelData.Hazard spike:data().spikes)drawSpike(canvas,spike);
-        for(LevelData.Gate gate:data().gates)drawGate(canvas,gate);
-        for(int i=0;i<data().items.size();i++)drawItem(canvas,data().items.get(i),collected[i]);
-        drawMarkers(canvas);
-        drawSphere(canvas);
-        canvas.restore();
-        drawHud(canvas,ww,hh);
-        canvas.restore();
+    @Override protected void onDraw(Canvas c) {
+        super.onDraw(c);
+        if(getWidth()<2||getHeight()<2)return;
+        scale=Math.min(getWidth()/1180f,getHeight()/770f);
+        float vw=getWidth()/scale,vh=getHeight()/scale;
+        long now=System.nanoTime();float frame=clamp((now-last)*1e-9f,0,.04f);last=now;
+        for(float time=frame;time>0;){float dt=Math.min(time,STEP);tick(dt);time-=dt;}
+        float maxX=Math.max(0,world().columns*TILE-vw);
+        float maxY=Math.max(0,world().rows*TILE-vh);
+        float wantX=clamp(x-vw*.46f,0,maxX);
+        float wantY=clamp(y-vh*.43f,0,maxY);
+        camX+=(wantX-camX)*Math.min(1,frame*6);
+        camY+=(wantY-camY)*Math.min(1,frame*5);
+        c.save();c.scale(scale,scale);
+        backdrop(c,vw,vh);
+        c.save();c.translate(-camX,-camY);
+        shafts(c);
+        blocks(c,vw,vh);
+        for(LevelData.Gate gate:world().gates)drawGate(c,gate);
+        for(int i=0;i<world().items.size();i++)drawItem(c,world().items.get(i),collected[i]);
+        drawCheckpoints(c);
+        exit(c);
+        ball(c);
+        c.restore();
+        headsUp(c,vw,vh);
+        c.restore();
         postInvalidateOnAnimation();
     }
-    private void background(Canvas c,float ww,float hh) {
-        paint.setShader(new LinearGradient(0,0,0,hh,
-                0xff0b1c2c,0xff284251,Shader.TileMode.CLAMP));
-        c.drawRect(0,0,ww,hh,paint);paint.setShader(null);
-        paint.setStrokeWidth(1);
-        paint.setColor(0x264e7b8b);
-        for(int i=-2;i<32;i++) {
-            float x=(i*122-camX*.14f)%(ww+122);
-            c.drawLine(x,0,x,hh,paint);
+
+    private void backdrop(Canvas c,float vw,float vh) {
+        p.setShader(new LinearGradient(0,0,0,vh,0xff0b1c2a,0xff274555,Shader.TileMode.CLAMP));
+        c.drawRect(0,0,vw,vh,p);p.setShader(null);
+        p.setColor(0x266c98aa);p.setStrokeWidth(1);
+        for(int i=-2;i<(int)(vw/82)+4;i++) {
+            float line=((i*82-camX*.10f)%(vw+82));
+            c.drawLine(line,0,line,vh,p);
         }
-        paint.setColor(0x1d6e9caa);
-        for(int i=0;i<13;i++) {
-            float y=(i*94-camY*.12f)%(hh+94);
-            c.drawLine(0,y,ww,y,paint);
+        for(int i=0;i<(int)(vh/82)+3;i++) {
+            float line=((i*82-camY*.10f)%(vh+82));
+            c.drawLine(0,line,vw,line,p);
         }
     }
-    private void drawGround(Canvas c){
-        drawStone(c,-200,CEILING-125,data().finish+200,CEILING,true);
-        float from=-200;
-        for(LevelData.Segment gap:data().gaps){
-            if(from<gap.from)drawStone(c,from,FLOOR,gap.from,FLOOR+210,false);
-            // Shaded shaft really marks missing collision geometry.
-            paint.setColor(0x99203241);
-            c.drawRect(gap.from,FLOOR,gap.to,FLOOR+320,paint);
-            paint.setColor(0xffd59667);
-            c.drawRect(gap.from-5,FLOOR,gap.from+5,FLOOR+28,paint);
-            c.drawRect(gap.to-5,FLOOR,gap.to+5,FLOOR+28,paint);
-            from=gap.to;
+    private void blocks(Canvas c,float vw,float vh) {
+        int x0=Math.max(0,(int)Math.floor(camX/TILE)-2),x1=Math.min(world().columns-1,(int)Math.ceil((camX+vw)/TILE)+2);
+        int y0=Math.max(0,(int)Math.floor(camY/TILE)-2),y1=Math.min(world().rows-1,(int)Math.ceil((camY+vh)/TILE)+2);
+        for(int row=y0;row<=y1;row++)for(int col=x0;col<=x1;col++){
+            if(world().tiles[row][col]!='#')continue;
+            float a=col*TILE,b=row*TILE;
+            p.setShader(new LinearGradient(a,b,a,b+TILE,0xff839ba9,0xff304b5b,Shader.TileMode.CLAMP));
+            c.drawRect(a,b,a+TILE,b+TILE,p);p.setShader(null);
+            p.setColor(0xff91b0ba);
+            c.drawRect(a,b,a+TILE,b+3,p);
+            p.setColor(0x66597889);
+            c.drawRect(a+TILE-3,b,a+TILE,b+TILE,p);
+            p.setColor(0x6650707b);
+            c.drawRect(a+10,b+TILE-12,a+TILE-10,b+TILE-10,p);
         }
-        drawStone(c,from,FLOOR,data().finish+200,FLOOR+210,false);
     }
-    private void drawStone(Canvas c,float a,float top,float b,float bottom,boolean ceiling){
-        if(b<=a)return;
-        paint.setShader(new LinearGradient(0,top,0,bottom,
-                ceiling?0xff27404c:0xff96aab3,
-                ceiling?0xff889ca6:0xff283f4b,Shader.TileMode.CLAMP));
-        c.drawRect(a,top,b,bottom,paint);paint.setShader(null);
-        float edge=ceiling?bottom-8:top;
-        paint.setColor(0xffbdd1d3);c.drawRect(a,edge,b,edge+8,paint);
-        paint.setStrokeWidth(2);paint.setColor(0x66334751);
-        for(float tx=Math.max(a,0)+20;tx<b;tx+=84){
-            c.drawLine(tx,top+17,tx,bottom-15,paint);
-            c.drawLine(tx+7,ceiling?bottom-31:top+30,
-                    Math.min(b,tx+61),ceiling?bottom-31:top+30,paint);
+    private void shafts(Canvas c){
+        for(LevelData.Shaft s:world().shafts){
+            float center=(s.x1+s.x2)*.5f;
+            if(s.safe){
+                p.setColor(0x552de2d0);
+                c.drawRoundRect(new RectF(s.x1+5,s.top-13,s.x2-5,s.bottom+12),12,12,p);
+                p.setColor(0xff55ffda);p.setStrokeWidth(5);
+                c.drawLine(s.x1+6,s.top-5,s.x1+6,s.bottom+9,p);
+                c.drawLine(s.x2-6,s.top-5,s.x2-6,s.bottom+9,p);
+                p.setTextAlign(Paint.Align.CENTER);p.setTextSize(28);
+                p.setTypeface(Typeface.DEFAULT_BOLD);p.setColor(0xffd9fff7);
+                c.drawText("↓",center,(s.top+s.bottom)*.5f+9,p);
+                p.setTextSize(13);c.drawText("DURCHGANG",center,s.top-19,p);
+                p.setTextAlign(Paint.Align.LEFT);
+            }else{
+                p.setColor(0xe2140910);
+                c.drawRect(s.x1,s.top,s.x2,s.bottom,p);
+                p.setColor(0xfff2484c);p.setStrokeWidth(6);
+                c.drawLine(s.x1,s.top,s.x2,s.top,p);
+                // Repeated red teeth make a lethal gap unmistakable.
+                Path teeth=new Path();
+                for(float xx=s.x1;xx<s.x2;xx+=18){
+                    teeth.moveTo(xx,s.top+6);
+                    teeth.lineTo(xx+9,s.top+28);
+                    teeth.lineTo(Math.min(s.x2,xx+18),s.top+6);
+                }
+                p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(3);
+                c.drawPath(teeth,p);p.setStyle(Paint.Style.FILL);
+                p.setTextAlign(Paint.Align.CENTER);p.setTypeface(Typeface.DEFAULT_BOLD);
+                p.setTextSize(15);p.setColor(0xffffe3d7);
+                c.drawText("GEFAHR",center,s.top-17,p);
+                p.setTextAlign(Paint.Align.LEFT);
+            }
         }
-        paint.setColor(0x88d5e5e8);
-        for(float tx=Math.max(a,0)+31;tx<b;tx+=84)
-            c.drawCircle(tx,edge+(ceiling?1:14),2.3f,paint);
     }
-    private void drawShelf(Canvas c,LevelData.Segment shelf) {
-        RectF box=new RectF(shelf.from,shelf.y,shelf.to,shelf.y+19);
-        paint.setShader(new LinearGradient(0,shelf.y,0,shelf.y+19,
-                0xffc4d3d7,0xff465e69,Shader.TileMode.CLAMP));
-        c.drawRoundRect(box,6,6,paint);paint.setShader(null);
-        paint.setColor(0xffe2f4f2);
-        c.drawRoundRect(new RectF(shelf.from,shelf.y,shelf.to,shelf.y+4),3,3,paint);
+    private static int vivid(int color){
+        if(color==LevelData.BLUE)return 0xff00dbff;
+        if(color==LevelData.ORANGE)return 0xffff9c00;
+        if(color==LevelData.VIOLET)return 0xffd368ff;
+        return 0xffd5e9f1;
     }
-    private void drawSpike(Canvas c,LevelData.Hazard spike){
-        float xx=spike.x,yy=spike.base;
-        Path triangles=new Path();
-        triangles.moveTo(xx-27,yy);triangles.lineTo(xx-15,yy-32);
-        triangles.lineTo(xx-4,yy);triangles.lineTo(xx+8,yy-36);
-        triangles.lineTo(xx+27,yy);triangles.close();
-        paint.setShader(new LinearGradient(xx,yy-34,xx,yy,
-                0xffffe0b0,0xffc45135,Shader.TileMode.CLAMP));
-        c.drawPath(triangles,paint);paint.setShader(null);
-        paint.setStyle(Paint.Style.STROKE);paint.setColor(0xfff9b784);
-        paint.setStrokeWidth(2);c.drawPath(triangles,paint);
-        paint.setStyle(Paint.Style.FILL);
-    }
-    private static int vivid(int color) {
-        if(color==LevelData.BLUE)return 0xff08d7ff;
-        if(color==LevelData.AMBER)return 0xffffa500;
-        if(color==LevelData.VIOLET)return 0xffbe63ff;
-        return 0xffd7ebf2;
-    }
-    private static int shadow(int color) {
-        if(color==LevelData.BLUE)return 0xff056997;
-        if(color==LevelData.AMBER)return 0xffa64a0f;
-        if(color==LevelData.VIOLET)return 0xff6332a0;
-        return 0xff263e4d;
+    private static int dark(int color){
+        if(color==LevelData.BLUE)return 0xff095d9c;
+        if(color==LevelData.ORANGE)return 0xff8b3c13;
+        if(color==LevelData.VIOLET)return 0xff54298c;
+        return 0xff293f51;
     }
     private static String colorName(int col){
         if(col==LevelData.BLUE)return "BLAU";
-        if(col==LevelData.AMBER)return "ORANGE";
+        if(col==LevelData.ORANGE)return "ORANGE";
         if(col==LevelData.VIOLET)return "VIOLETT";
         return "NEUTRAL";
     }
-    private static String colorMark(int col){
+    private static String colorLetter(int col) {
         if(col==LevelData.BLUE)return "B";
-        if(col==LevelData.AMBER)return "O";
+        if(col==LevelData.ORANGE)return "O";
         if(col==LevelData.VIOLET)return "V";
-        return "–";
+        return "-";
     }
-    private void drawGate(Canvas c,LevelData.Gate gate){
-        float gx=gate.x,top=gateTop(gate),bottom=gateBottom(gate);
-        boolean open=!gate.blocks(color);
-        paint.setShader(new LinearGradient(gx-15,0,gx+15,0,
-                vivid(gate.color),shadow(gate.color),Shader.TileMode.CLAMP));
-        paint.setAlpha(open?44:238);
-        c.drawRoundRect(new RectF(gx-GATE_HALF,top,gx+GATE_HALF,bottom),7,7,paint);
-        paint.setShader(null);paint.setAlpha(255);
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(open?2:4);
-        paint.setColor(open?0x806fc6db:vivid(gate.color));
-        c.drawRoundRect(new RectF(gx-GATE_HALF,top,gx+GATE_HALF,bottom),7,7,paint);
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(open?0x99ffffff:0xffffffff);
-        paint.setTextAlign(Paint.Align.CENTER);paint.setTextSize(22);
-        paint.setTypeface(Typeface.DEFAULT_BOLD);
-        for(float yy=top+39;yy<bottom-6;yy+=75)
-            c.drawText(colorMark(gate.color),gx,yy,paint);
-        paint.setTextAlign(Paint.Align.LEFT);
+    private void drawGate(Canvas c,LevelData.Gate g){
+        boolean open=color==g.color;
+        float a=g.x-12,b=g.x+12;
+        p.setShader(new LinearGradient(a,g.top,b,g.bottom,vivid(g.color),dark(g.color),Shader.TileMode.CLAMP));
+        p.setAlpha(open?40:242);
+        c.drawRoundRect(new RectF(a,g.top,b,g.bottom),6,6,p);
+        p.setShader(null);p.setAlpha(255);
+        p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(open?2:3);
+        p.setColor(open?0x9962b5ba:vivid(g.color));
+        c.drawRoundRect(new RectF(a,g.top,b,g.bottom),6,6,p);
+        p.setStyle(Paint.Style.FILL);
+        p.setColor(0xffffffff);
+        p.setTypeface(Typeface.DEFAULT_BOLD);p.setTextSize(21);
+        p.setTextAlign(Paint.Align.CENTER);
+        for(float yy=g.top+33;yy<g.bottom-8;yy+=64)c.drawText(colorLetter(g.color),g.x,yy,p);
+        p.setTextAlign(Paint.Align.LEFT);
     }
-    private void drawItem(Canvas c,LevelData.Item item,boolean used) {
+    private void drawItem(Canvas c,LevelData.Item item,boolean collected){
         float xx=item.x,yy=item.y;
         if(item.type==LevelData.COLOR) {
-            // Big high-saturation swatch: obvious even when zoomed far out.
-            int bright=vivid(item.value);
-            paint.setColor(0x8840dce6);c.drawCircle(xx,yy,48,paint);
-            paint.setColor(0xff0c2535);c.drawCircle(xx,yy,43,paint);
-            Path diamond=new Path();
-            diamond.moveTo(xx,yy-39);diamond.lineTo(xx+36,yy);
-            diamond.lineTo(xx,yy+39);diamond.lineTo(xx-36,yy);diamond.close();
-            paint.setColor(bright);c.drawPath(diamond,paint);
-            paint.setStyle(Paint.Style.STROKE);
-            paint.setColor(0xfff5ffff);paint.setStrokeWidth(4);c.drawPath(diamond,paint);
-            paint.setStyle(Paint.Style.FILL);
-            paint.setColor(0xff10263a);paint.setTextAlign(Paint.Align.CENTER);
-            paint.setTypeface(Typeface.DEFAULT_BOLD);paint.setTextSize(28);
-            c.drawText(colorMark(item.value),xx,yy+10,paint);
-            paint.setTextAlign(Paint.Align.LEFT);
-        } else if(item.type==LevelData.GRAVITY) {
-            paint.setColor(0x8882f1c1);c.drawCircle(xx,yy,43,paint);
-            paint.setColor(0xff123b45);c.drawRoundRect(new RectF(xx-35,yy-35,xx+35,yy+35),11,11,paint);
-            paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(4);
-            paint.setColor(0xffa0ffd8);
-            c.drawRoundRect(new RectF(xx-35,yy-35,xx+35,yy+35),11,11,paint);
-            paint.setStyle(Paint.Style.FILL);
-            paint.setColor(0xffffffff);paint.setTextAlign(Paint.Align.CENTER);
-            paint.setTypeface(Typeface.DEFAULT_BOLD);paint.setTextSize(49);
-            c.drawText(item.value==LevelData.UP?"↑":"↓",xx,yy+17,paint);
-            paint.setTextAlign(Paint.Align.LEFT);
+            p.setColor(0x6640f1d8);c.drawCircle(xx,yy,34,p);
+            p.setColor(0xff102333);c.drawCircle(xx,yy,29,p);
+            Path d=new Path();
+            d.moveTo(xx,yy-27);d.lineTo(xx+26,yy);d.lineTo(xx,yy+27);d.lineTo(xx-26,yy);d.close();
+            p.setColor(vivid(item.value));c.drawPath(d,p);
+            p.setColor(0xffffffff);p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(3);c.drawPath(d,p);p.setStyle(Paint.Style.FILL);
+            p.setTextAlign(Paint.Align.CENTER);p.setTypeface(Typeface.DEFAULT_BOLD);
+            p.setTextSize(22);p.setColor(0xff112033);
+            c.drawText(colorLetter(item.value),xx,yy+8,p);
+            p.setTextAlign(Paint.Align.LEFT);
+        }else if(item.type==LevelData.GRAVITY){
+            p.setColor(0x9966e6d3);c.drawCircle(xx,yy,30,p);
+            p.setColor(0xff173c4a);c.drawRoundRect(new RectF(xx-26,yy-26,xx+26,yy+26),9,9,p);
+            p.setColor(0xffb5ffe7);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(3);
+            c.drawRoundRect(new RectF(xx-26,yy-26,xx+26,yy+26),9,9,p);
+            p.setStyle(Paint.Style.FILL);p.setTextAlign(Paint.Align.CENTER);
+            p.setColor(0xffffffff);p.setTextSize(35);p.setTypeface(Typeface.DEFAULT_BOLD);
+            c.drawText(item.value==LevelData.UP?"↑":"↓",xx,yy+12,p);
+            p.setTextAlign(Paint.Align.LEFT);
         } else {
-            // Single-award point token stays in the world after collection.
-            // Pending: opaque black with a white number.
-            // Collected: semi-transparent white with a black number.
-            paint.setColor(used?0x88ffffff:0xff07090c);
-            c.drawCircle(xx,yy,35,paint);
-            paint.setColor(used?0xff000000:0xffffffff);
-            paint.setTypeface(Typeface.DEFAULT_BOLD);
-            paint.setTextAlign(Paint.Align.CENTER);
-            paint.setTextSize(item.value==10?28:31);
-            c.drawText(Integer.toString(item.value),xx,yy+11,paint);
-            paint.setTextAlign(Paint.Align.LEFT);
+            // Not collected: black with white number.
+            // Collected: semi-transparent white with black number, never awarded twice.
+            p.setColor(collected?0x88ffffff:0xff05070a);
+            c.drawCircle(xx,yy,23,p);
+            p.setColor(collected?0xff000000:0xffffffff);
+            p.setTypeface(Typeface.DEFAULT_BOLD);p.setTextAlign(Paint.Align.CENTER);
+            p.setTextSize(item.value==10?20:22);
+            c.drawText(Integer.toString(item.value),xx,yy+7.5f,p);
+            p.setTextAlign(Paint.Align.LEFT);
         }
     }
-    private void drawMarkers(Canvas c) {
-        paint.setColor(0xffa0bdc3);
-        c.drawRoundRect(new RectF(76,FLOOR-90,87,FLOOR),4,4,paint);
-        for(int i=0;i<data().checkpoints.size();i++) {
-            float xx=data().checkpoints.get(i);
-            paint.setColor(checkpointUsed[i]?0xff80f5c7:0xffe4c878);
-            c.drawRoundRect(new RectF(xx-6,FLOOR-82,xx+6,FLOOR),4,4,paint);
-            paint.setStyle(Paint.Style.STROKE);
-            paint.setStrokeWidth(3);c.drawCircle(xx,FLOOR-86,16,paint);
-            paint.setStyle(Paint.Style.FILL);
+    private void drawCheckpoints(Canvas c){
+        for(float[] cp:world().checkpoints){
+            p.setColor(hasCheckpoint&&checkpointX>=cp[0]-2?0xff65e8c4:0xfff2d38a);
+            c.drawRoundRect(new RectF(cp[0]-5,cp[1]-53,cp[0]+5,cp[1]+16),4,4,p);
+            p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(2);
+            c.drawCircle(cp[0],cp[1]-56,12,p);p.setStyle(Paint.Style.FILL);
         }
-        float xx=data().finish;
-        boolean open=score>=data().target;
-        paint.setColor(open?0xff63eac5:0xffe46e57);
-        c.drawRoundRect(new RectF(xx-15,CEILING+10,xx+16,FLOOR-8),9,9,paint);
-        paint.setColor(0xff153544);
-        c.drawRoundRect(new RectF(xx-9,CEILING+20,xx+10,FLOOR-19),6,6,paint);
-        paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(5);
-        paint.setColor(open?0xffb6ffe9:0xffffbaa2);
-        c.drawCircle(xx,(CEILING+FLOOR)*.5f,40,paint);
-        paint.setStyle(Paint.Style.FILL);
-        paint.setTextAlign(Paint.Align.CENTER);paint.setTypeface(Typeface.DEFAULT_BOLD);
-        paint.setTextSize(24);paint.setColor(0xffffffff);
-        c.drawText(open?"✓":"🔒",xx,(CEILING+FLOOR)*.5f+8,paint);
-        // The exit itself shows the *remaining* points, not just the total.
-        // Always visible in world space; updates instantly after each pickup.
-        int missing=Math.max(0,data().target-score);
-        String gateLabel=open?"OFFEN":"NOCH "+missing+(missing==1?" PUNKT":" PUNKTE");
-        float labelY=(CEILING+FLOOR)*.5f+103;
-        paint.setTypeface(Typeface.DEFAULT_BOLD);
-        paint.setTextSize(21);
-        float halfWidth=Math.max(69,paint.measureText(gateLabel)*.5f+15);
-        paint.setColor(0xde102632);
-        c.drawRoundRect(new RectF(xx-halfWidth,labelY-31,
-                xx+halfWidth,labelY+12),9,9,paint);
-        paint.setColor(open?0xff9affe0:0xffffd4c7);
-        c.drawText(gateLabel,xx,labelY,paint);
-        paint.setTextAlign(Paint.Align.LEFT);
     }
-    private void drawSphere(Canvas c){
-        float yy=gravity==LevelData.UP?CEILING:FLOOR;
-        paint.setColor(0x68051120);
-        c.drawOval(new RectF(x-26,yy-6,x+26,yy+6),paint);
-        int bright=color==LevelData.NONE?0xffeefbff:vivid(color);
-        int mid=color==LevelData.NONE?0xff9db5c0:bright;
-        paint.setShader(new RadialGradient(x-10,y-12,R*2.15f,
-                new int[]{0xffffffff,0xfff1fbff,mid,shadow(color)},
-                new float[]{0,.19f,.45f,1},Shader.TileMode.CLAMP));
-        c.drawCircle(x,y,R,paint);paint.setShader(null);
-        c.save();c.rotate(x*180/(float)Math.PI/R,x,y);
-        paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(3.3f);
-        paint.setColor(0x88ffffff);
-        c.drawArc(new RectF(x-16,y-16,x+16,y+16),31,140,false,paint);
-        paint.setColor(0x66405667);
-        c.drawArc(new RectF(x-11,y-11,x+11,y+11),218,112,false,paint);
-        paint.setStyle(Paint.Style.FILL);c.restore();
-        paint.setColor(0xeaffffff);c.drawCircle(x-10,y-12,4.5f,paint);
+    private void exit(Canvas c) {
+        float xx=world().exitX, yy=world().exitY;
+        boolean open=score>=world().target;
+        p.setColor(open?0xff46e7b6:0xffea6b57);
+        c.drawRoundRect(new RectF(xx-14,yy-60,xx+14,yy+62),9,9,p);
+        p.setColor(0xff18313e);
+        c.drawRoundRect(new RectF(xx-9,yy-52,xx+9,yy+54),5,5,p);
+        p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(4);
+        p.setColor(open?0xffbcffe5:0xffffc9b2);
+        c.drawCircle(xx,yy,28,p);p.setStyle(Paint.Style.FILL);
+        String label=open?"OFFEN":"NOCH "+(world().target-score);
+        String label2=open?"":((world().target-score)==1?"PUNKT":"PUNKTE");
+        p.setTypeface(Typeface.DEFAULT_BOLD);p.setTextAlign(Paint.Align.CENTER);
+        p.setTextSize(18);
+        float yLabel=yy-79;
+        p.setColor(0xe0122533);
+        c.drawRoundRect(new RectF(xx-80,yLabel-24,xx+80,yLabel+(open?7:25)),8,8,p);
+        p.setColor(open?0xffaaffd7:0xffffd0bd);
+        c.drawText(label,xx,yLabel,p);
+        if(!open)c.drawText(label2,xx,yLabel+20,p);
+        p.setTextAlign(Paint.Align.LEFT);
+    }
+    private void ball(Canvas c) {
+        int bright=vivid(color),base=dark(color);
+        p.setShader(new RadialGradient(x-6,y-8,R*2.1f,
+                new int[]{0xffffffff,0xffe8faff,bright,base},
+                new float[]{0,.27f,.49f,1},Shader.TileMode.CLAMP));
+        c.drawCircle(x,y,R,p);p.setShader(null);
+        c.save();c.rotate(x*180f/(float)Math.PI/R,x,y);
+        p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(2.6f);p.setColor(0xb1f4ffff);
+        c.drawArc(new RectF(x-11,y-11,x+11,y+11),28,135,false,p);
+        p.setStyle(Paint.Style.FILL);c.restore();
+        p.setColor(0xffffffff);c.drawCircle(x-7,y-8,3.4f,p);
     }
 
-    private void drawHud(Canvas c,float ww,float hh) {
-        paint.setTextAlign(Paint.Align.LEFT);
-        paint.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));
-        paint.setColor(0xfff1fcff);paint.setTextSize(23);
-        c.drawText(String.format(Locale.GERMANY,"LEVEL %02d / 10",level+1),26,37,paint);
-        paint.setTextAlign(Paint.Align.RIGHT);
-        paint.setColor(score>=data().target?0xff77ffcd:0xffffd787);
-        paint.setTextSize(23);
-        c.drawText("PUNKTE  "+score+" / "+data().target,ww-26,37,paint);
-        paint.setTextAlign(Paint.Align.LEFT);
-        paint.setColor(0xffbddee4);paint.setTextSize(16);
-        String tip=data().name+"  ·  "+data().tip;
-        float max=ww-52;
-        while(tip.length()>8 && paint.measureText(tip)>max)tip=tip.substring(0,tip.length()-2);
-        c.drawText(tip,26,64,paint);
-
-        // Functional route progress indicator for the larger scrolling levels.
-        float a=30,b=ww-30,progress=clamp(x/data().finish,0,1);
-        paint.setColor(0x994d6f80);
-        c.drawRoundRect(new RectF(a,80,b,87),4,4,paint);
-        paint.setColor(0xff8ee3d7);
-        c.drawRoundRect(new RectF(a,80,a+(b-a)*progress,87),4,4,paint);
-        for(LevelData.Branch branch:data().branches) {
-            float px=a+(b-a)*branch.x/data().finish;
-            paint.setColor(0xffffd681);
-            c.drawCircle(px,83.5f,5,paint);
+    private void headsUp(Canvas c,float vw,float vh){
+        p.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));
+        p.setTextAlign(Paint.Align.LEFT);p.setTextSize(22);p.setColor(0xfff1ffff);
+        c.drawText(String.format(Locale.GERMANY,"LEVEL %02d / 10",level+1),24,34,p);
+        p.setTextAlign(Paint.Align.RIGHT);
+        p.setColor(score>=world().target?0xff8bffd7:0xffffe098);
+        c.drawText("PUNKTE "+score+" / "+world().target,vw-25,34,p);
+        p.setTextAlign(Paint.Align.LEFT);p.setTextSize(15);p.setColor(0xffd0e5e9);
+        String subtitle=world().name+"  |  "+world().tip;
+        while(subtitle.length()>10&&p.measureText(subtitle)>vw-50)
+            subtitle=subtitle.substring(0,subtitle.length()-2);
+        c.drawText(subtitle,24,58,p);
+        float leftMargin=28,rightMargin=vw-28;
+        p.setColor(0x99567785);c.drawRoundRect(new RectF(leftMargin,76,rightMargin,83),4,4,p);
+        float factor=clamp(x/(world().columns*TILE),0,1);
+        p.setColor(0xff84ddcb);
+        c.drawRoundRect(new RectF(leftMargin,76,leftMargin+(rightMargin-leftMargin)*factor,83),4,4,p);
+        p.setColor(0xffedfef9);c.drawCircle(leftMargin+(rightMargin-leftMargin)*factor,79,7,p);
+        if(messageTime>0||tipTime>0){
+            p.setTextAlign(Paint.Align.CENTER);p.setTypeface(Typeface.DEFAULT_BOLD);
+            p.setTextSize(23);p.setColor(0xffd4fff3);
+            c.drawText(messageTime>0?message:world().name,vw/2,116,p);
+            p.setTextAlign(Paint.Align.LEFT);
         }
-        paint.setColor(0xffffffff);
-        c.drawCircle(a+(b-a)*progress,83.5f,8,paint);
-        if(toastTime>0||titleTime>0){
-            paint.setTextAlign(Paint.Align.CENTER);
-            paint.setTypeface(Typeface.DEFAULT_BOLD);paint.setTextSize(24);
-            paint.setColor(0xffdbf9ed);
-            c.drawText(toastTime>0?toast:data().name,ww/2,122,paint);
-            paint.setTextAlign(Paint.Align.LEFT);
-        }
-        paint.setTextSize(15);paint.setColor(0xffabcad2);
-        c.drawText("FARBE: "+colorName(color)+"    GRAVITATION: "+(gravity==LevelData.UP?"↑":"↓"),27,hh-20,paint);
-        int best=prefs.getInt("best_003_"+level,0);
-        paint.setTextAlign(Paint.Align.RIGHT);
-        c.drawText("BESTWERT "+best+"     ← + → 2,5 s: Neustart",ww-26,hh-20,paint);
-        paint.setTextAlign(Paint.Align.LEFT);
-        button(c,105,hh-106,71,1,!left.isEmpty());
-        button(c,273,hh-106,71,2,!right.isEmpty());
-        button(c,ww-108,hh-109,78,3,!jump.isEmpty());
-
-        if(complete){
-            paint.setColor(0xe40c2936);
-            c.drawRoundRect(new RectF(ww*.15f,hh*.23f,ww*.85f,hh*.69f),20,20,paint);
-            paint.setColor(0xffb9ffe4);paint.setTextAlign(Paint.Align.CENTER);
-            paint.setTypeface(Typeface.DEFAULT_BOLD);paint.setTextSize(32);
-            c.drawText("ALLE ZEHN LEVEL GESCHAFFT",ww*.5f,hh*.41f,paint);
-            paint.setColor(0xfff1ffff);paint.setTextSize(20);
-            c.drawText("SPRINGEN: Neue Runde",ww*.5f,hh*.52f,paint);
-            paint.setTextAlign(Paint.Align.LEFT);
+        button(c,105,vh-104,70,1,!left.isEmpty());
+        button(c,268,vh-104,70,2,!right.isEmpty());
+        button(c,vw-107,vh-108,78,3,!jump.isEmpty());
+        p.setTextSize(15);p.setColor(0xffbdd5df);
+        c.drawText("FARBE "+colorName(color)+"  |  GRAVITATION "+(gravity==LevelData.UP?"↑":"↓"),26,vh-16,p);
+        p.setTextAlign(Paint.Align.RIGHT);
+        c.drawText("← + → halten: Neustart",vw-26,vh-16,p);
+        p.setTextAlign(Paint.Align.LEFT);
+        if(complete) {
+            p.setColor(0xe20b2632);
+            c.drawRoundRect(new RectF(vw*.15f,vh*.26f,vw*.85f,vh*.66f),20,20,p);
+            p.setTextAlign(Paint.Align.CENTER);p.setTypeface(Typeface.DEFAULT_BOLD);
+            p.setTextSize(30);p.setColor(0xffc1ffdf);
+            c.drawText("ALLE LABYRINTHE GELÖST",vw*.5f,vh*.43f,p);
+            p.setTextSize(20);p.setColor(0xffffffff);
+            c.drawText("SPRINGEN: Neue Runde",vw*.5f,vh*.53f,p);
+            p.setTextAlign(Paint.Align.LEFT);
         }
     }
-    private void button(Canvas c,float xx,float yy,float r,int type,boolean pressed){
-        paint.setColor(pressed?0xd269e4cc:0x99516b7b);
-        c.drawCircle(xx,yy,r,paint);
-        paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(3);
-        paint.setColor(0xffc3e0e5);c.drawCircle(xx,yy,r,paint);
-        paint.setStyle(Paint.Style.FILL);
-        Path tri=new Path();float t=29;
+    private void button(Canvas c,float xx,float yy,float rad,int type,boolean pressed){
+        p.setColor(pressed?0xd56ee7cc:0x99516d7e);c.drawCircle(xx,yy,rad,p);
+        p.setColor(0xffc5e5e8);p.setStyle(Paint.Style.STROKE);
+        p.setStrokeWidth(3);c.drawCircle(xx,yy,rad,p);p.setStyle(Paint.Style.FILL);
+        Path t=new Path();float size=29;
         if(type==1){
-            tri.moveTo(xx-t,yy);tri.lineTo(xx+t*.60f,yy-t);tri.lineTo(xx+t*.60f,yy+t);
-        } else if(type==2){
-            tri.moveTo(xx+t,yy);tri.lineTo(xx-t*.60f,yy-t);tri.lineTo(xx-t*.60f,yy+t);
-        } else {
-            tri.moveTo(xx,yy-t);tri.lineTo(xx-t,yy+t*.60f);tri.lineTo(xx+t,yy+t*.60f);
+            t.moveTo(xx-size,yy);t.lineTo(xx+size*.65f,yy-size);t.lineTo(xx+size*.65f,yy+size);
+        }else if(type==2){
+            t.moveTo(xx+size,yy);t.lineTo(xx-size*.65f,yy-size);t.lineTo(xx-size*.65f,yy+size);
+        }else{
+            t.moveTo(xx,yy-size);t.lineTo(xx-size,yy+size*.65f);t.lineTo(xx+size,yy+size*.65f);
         }
-        tri.close();paint.setColor(0xffffffff);c.drawPath(tri,paint);
+        t.close();p.setColor(0xffffffff);c.drawPath(t,p);
     }
-    private int control(float rawX,float rawY) {
-        float px=rawX/scale,py=rawY/scale;
-        float ww=getWidth()/scale,hh=getHeight()/scale;
-        if(Math.hypot(px-105,py-(hh-106))<90)return 1;
-        if(Math.hypot(px-273,py-(hh-106))<90)return 2;
-        if(Math.hypot(px-(ww-108),py-(hh-109))<99)return 3;
+    private int control(float rawX,float rawY){
+        float xx=rawX/scale,yy=rawY/scale,vw=getWidth()/scale,vh=getHeight()/scale;
+        if(Math.hypot(xx-105,yy-(vh-104))<90)return 1;
+        if(Math.hypot(xx-268,yy-(vh-104))<90)return 2;
+        if(Math.hypot(xx-(vw-107),yy-(vh-108))<98)return 3;
         return 0;
     }
-    private void assign(int pointer,int target) {
-        boolean wasJump=!jump.isEmpty();
+    private void assign(int pointer,int type){
+        boolean previous=!jump.isEmpty();
         left.remove(pointer);right.remove(pointer);jump.remove(pointer);
-        if(target==1)left.add(pointer);
-        if(target==2)right.add(pointer);
-        if(target==3){
+        if(type==1)left.add(pointer);
+        if(type==2)right.add(pointer);
+        if(type==3){
             jump.add(pointer);
-            if(!wasJump){
-                if(complete)beginLevel(true);
-                else jumpBuffer=.17f;
+            if(!previous){
+                if(complete)begin(true);
+                else jumpBuffer=.16f;
             }
         }
     }
-    @Override public boolean onTouchEvent(MotionEvent e) {
-        int action=e.getActionMasked(),i=e.getActionIndex();
+    @Override public boolean onTouchEvent(MotionEvent e){
+        int action=e.getActionMasked(),idx=e.getActionIndex();
         if(action==MotionEvent.ACTION_DOWN||action==MotionEvent.ACTION_POINTER_DOWN){
-            assign(e.getPointerId(i),control(e.getX(i),e.getY(i)));
-        } else if(action==MotionEvent.ACTION_MOVE) {
-            for(int k=0;k<e.getPointerCount();k++)
-                assign(e.getPointerId(k),control(e.getX(k),e.getY(k)));
-        } else if(action==MotionEvent.ACTION_POINTER_UP||action==MotionEvent.ACTION_UP){
-            assign(e.getPointerId(i),0);
-        } else if(action==MotionEvent.ACTION_CANCEL){
-            left.clear();right.clear();jump.clear();restartHold=0;
+            assign(e.getPointerId(idx),control(e.getX(idx),e.getY(idx)));
+        }else if(action==MotionEvent.ACTION_MOVE){
+            for(int i=0;i<e.getPointerCount();i++)
+                assign(e.getPointerId(i),control(e.getX(i),e.getY(i)));
+        }else if(action==MotionEvent.ACTION_POINTER_UP||action==MotionEvent.ACTION_UP){
+            assign(e.getPointerId(idx),0);
+        }else if(action==MotionEvent.ACTION_CANCEL){
+            left.clear();right.clear();jump.clear();resetHold=0;
         }
         return true;
     }
