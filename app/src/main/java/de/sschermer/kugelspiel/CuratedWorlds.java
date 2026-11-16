@@ -95,9 +95,12 @@ final class CuratedWorlds {
     static LevelData.Level heliumWorks(){
         LevelData.Builder b=new LevelData.Builder(62,5,1,
                 "Die Heliumfabrik","Bringe die Kugel über zwei Etagen zum Deckenraum.");
-        b.shaft(0,12,true);b.shaft(0,49,true);gallery(b,0,24,29);
+        b.shaft(0,12,true);b.shaft(0,54,true);gallery(b,0,24,29);
         b.shaft(1,19,true);b.shaft(1,40,true);b.shaft(1,54,true);
-        b.shaft(2,14,true);b.shaft(2,40,true);b.shaft(2,52,true);
+        b.shaft(2,14,true);gallery(b,2,36,48);b.shaft(2,52,true);
+        // A sealed two-storey machine chimney: no intermediary landing
+        // can be used to stack-jump through its >250%-jump height.
+        for(int l=1;l<=2;l++){block(b,l,35,4);block(b,l,49,4);}
         b.shaft(3,11,true);b.shaft(3,50,true);gallery(b,3,23,27);
 
         p(b,0,6.5f,1);p(b,0,15.5f,5);
@@ -116,8 +119,8 @@ final class CuratedWorlds {
         p(b,2,8.5f,5);p(b,2,17.5f,1);
         ledge(b,2,24,3,2,10);
         dye(b,2,28.5f,LevelData.ORANGE);
-        gate(b,2,43.5f,LevelData.ORANGE);
-        p(b,2,47.5f,5);p(b,2,55.5f,1);
+        gate(b,2,54.5f,LevelData.ORANGE);
+        p(b,2,52.5f,5);p(b,2,57.5f,1);
 
         p(b,3,8.5f,5);p(b,3,18.5f,1);
         ledge(b,3,30,3,2,10);
@@ -183,7 +186,10 @@ final class CuratedWorlds {
         b.shaft(1,15,true);b.shaft(1,54,true);gallery(b,1,42,47);
         b.shaft(2,12,true);b.shaft(2,59,true);
         b.shaft(3,18,true);b.shaft(3,45,true);b.shaft(3,62,true);
-        b.shaft(4,13,true);b.shaft(4,45,true);gallery(b,4,25,30);
+        b.shaft(4,13,true);gallery(b,4,42,49);gallery(b,4,25,30);
+        // Another enclosed two-level helium chimney. Ordinary 250%
+        // jumps cannot bridge both stories without a landing ledge.
+        for(int l=3;l<=4;l++){block(b,l,41,4);block(b,l,50,4);}
 
         p(b,0,6.5f,1);p(b,0,13.5f,5);
         ledge(b,0,17,3,2,10);
@@ -213,7 +219,7 @@ final class CuratedWorlds {
 
         p(b,4,7.5f,1);p(b,4,18.5f,5);
         ledge(b,4,34,3,2,10);
-        p(b,4,40.5f,1);p(b,4,49.5f,5);p(b,4,59.5f,1);
+        p(b,4,40.5f,1);p(b,4,54.5f,5);p(b,4,59.5f,1);
 
         p(b,5,8.5f,5);p(b,5,16.5f,1);
         ledge(b,5,26,3,2,10);
