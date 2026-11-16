@@ -40,7 +40,7 @@ final class GameView extends View {
     GameView(Context context) {
         super(context);
         prefs=context.getSharedPreferences("kugelspiel_progress",Context.MODE_PRIVATE);
-        level=Math.max(0,Math.min(9,prefs.getInt("level_005",0)));
+        level=Math.max(0,Math.min(9,prefs.getInt("level_008",0)));
         begin(false);
         setFocusable(true);
     }
@@ -61,9 +61,18 @@ final class GameView extends View {
         tipTime=4.5f;messageTime=0;exitWarning=0;
         camX=0;camY=0;
         left.clear();right.clear();jump.clear();
-        prefs.edit().putInt("level_005",level).apply();
+        prefs.edit().putInt("level_008",level).apply();
     }
     private void msg(String t) {message=t;messageTime=1.65f;}
+    /** Completion depends on the individual token flags, not on a lower score target. */
+    private int missingTokens() {
+        int missing=0;
+        for(int i=0;i<world().items.size();i++){
+            if(world().items.get(i).type==LevelData.POINT && !collected[i])missing++;
+        }
+        return missing;
+    }
+    private boolean allTokensCollected(){return missingTokens()==0;}
     private void checkpoint(float px,float py) {
         if(hasCheckpoint && Math.abs(checkpointX-px)<2)return;
         hasCheckpoint=true;
@@ -81,8 +90,8 @@ final class GameView extends View {
         msg(hasCheckpoint?"Zurück zum Checkpoint":"Zurück zum Start");
     }
     private void next() {
-        int old=prefs.getInt("best_005_"+level,0);
-        if(score>old)prefs.edit().putInt("best_005_"+level,score).apply();
+        int old=prefs.getInt("best_008_"+level,0);
+        if(score>old)prefs.edit().putInt("best_008_"+level,score).apply();
         if(level==9){complete=true;finishDelay=0;msg("Alle Labyrinthe geschafft!");}
         else{level++;begin(false);}
     }
@@ -250,9 +259,9 @@ final class GameView extends View {
         }
         float ex=world().exitX,ey=world().exitY;
         if(Math.abs(x-ex)<35 && Math.abs(y-ey)<115) {
-            if(score>=world().target){finishDelay=.8f;vx=vy=0;msg("Ausgang geöffnet!");}
+            if(allTokensCollected()){finishDelay=.8f;vx=vy=0;msg("Alle Marken gesammelt!");}
             else if(exitWarning<=0) {
-                msg("Noch "+(world().target-score)+" Punkte nötig");
+                msg("Noch "+missingTokens()+" Marken sammeln");
                 exitWarning=2;
             }
         }
@@ -336,14 +345,8 @@ final class GameView extends View {
                 // at an artificial 100-unit-high decorative shaft.
                 c.drawLine(leftEdge+3,top-7,leftEdge+3,bottom+6,p);
                 c.drawLine(rightEdge-3,top-7,rightEdge-3,bottom+6,p);
-                p.setColor(0xffc8fff1);
-                p.setTypeface(Typeface.DEFAULT_BOLD);
-                p.setTextAlign(Paint.Align.CENTER);
-                p.setTextSize(18);
-                c.drawText("↓",center,bottom-3,p);
-                p.setTextSize(13);
-                c.drawText("DURCHGANG",center,top-14,p);
-                p.setTextAlign(Paint.Align.LEFT);
+                // All ordinary safe openings are unlabelled and bidirectional.
+                // No direction arrow: either direction is valid with suitable physics.
             }else{
                 p.setColor(0xff390e18);
                 c.drawRect(leftEdge,top,rightEdge,bottom,p);
@@ -360,12 +363,7 @@ final class GameView extends View {
                 p.setStrokeWidth(2.5f);
                 c.drawPath(teeth,p);
                 p.setStyle(Paint.Style.FILL);
-                p.setTextAlign(Paint.Align.CENTER);
-                p.setTypeface(Typeface.DEFAULT_BOLD);
-                p.setTextSize(14);
-                p.setColor(0xffffc4bd);
-                c.drawText("GEFAHR",center,top-13,p);
-                p.setTextAlign(Paint.Align.LEFT);
+                // Red hazard teeth convey death; no opening text labels.
             }
         }
     }
@@ -506,7 +504,7 @@ final class GameView extends View {
     }
     private void exit(Canvas c) {
         float xx=world().exitX, yy=world().exitY;
-        boolean open=score>=world().target;
+        boolean open=allTokensCollected();
         p.setColor(open?0xff46e7b6:0xffea6b57);
         c.drawRoundRect(new RectF(xx-14,yy-60,xx+14,yy+62),9,9,p);
         p.setColor(0xff18313e);
@@ -514,8 +512,8 @@ final class GameView extends View {
         p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(4);
         p.setColor(open?0xffbcffe5:0xffffc9b2);
         c.drawCircle(xx,yy,28,p);p.setStyle(Paint.Style.FILL);
-        String label=open?"OFFEN":"NOCH "+(world().target-score);
-        String label2=open?"":((world().target-score)==1?"PUNKT":"PUNKTE");
+        String label=open?"OFFEN":"NOCH "+missingTokens();
+        String label2=open?"":(missingTokens()==1?"MARKE":"MARKEN");
         p.setTypeface(Typeface.DEFAULT_BOLD);p.setTextAlign(Paint.Align.CENTER);
         p.setTextSize(18);
         float yLabel=yy-79;
@@ -554,8 +552,10 @@ final class GameView extends View {
         p.setTextAlign(Paint.Align.LEFT);p.setTextSize(22);p.setColor(0xfff1ffff);
         c.drawText(String.format(Locale.GERMANY,"LEVEL %02d / 10",level+1),24,34,p);
         p.setTextAlign(Paint.Align.RIGHT);
-        p.setColor(score>=world().target?0xff8bffd7:0xffffe098);
-        c.drawText("PUNKTE "+score+" / "+world().target,vw-25,34,p);
+        p.setColor(allTokensCollected()?0xff8bffd7:0xffffe098);
+        c.drawText("MARKEN "+(world().collectibleCount()-missingTokens())+
+                    "/"+world().collectibleCount()+"   •   PUNKTE "+score+"/"+world().target,
+                    vw-25,34,p);
         p.setTextAlign(Paint.Align.LEFT);p.setTextSize(15);p.setColor(0xffd0e5e9);
         String subtitle=world().name+"  |  "+world().tip;
         while(subtitle.length()>10&&p.measureText(subtitle)>vw-50)
