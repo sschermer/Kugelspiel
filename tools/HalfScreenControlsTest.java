@@ -18,10 +18,12 @@ public final class HalfScreenControlsTest {
         // Opposite finger within window jumps straight up while both remain held.
         check(!touch.press(5,HalfScreenControls.RIGHT,2000,true),"first contact");
         check(touch.press(8,HalfScreenControls.LEFT,2099,true),"99 ms opposite triggers jump");
+        check(touch.isVerticalPair(),"recognized vertical-pair gesture");
         check(touch.direction(2100)==0,"both held: vertical jump, no horizontal steering");
         check(touch.direction(2600)==0,"neutral pair persists until one finger released");
         touch.release(8,2610);
         check(touch.direction(2610)==HalfScreenControls.RIGHT,"remaining lead finger steers immediately");
+        check(!touch.isVerticalPair(),"released second finger unfreezes movement");
         check(touch.press(9,HalfScreenControls.LEFT,2640,false),"another opposite tap jumps");
         check(touch.direction(2640)==HalfScreenControls.RIGHT,"late second finger retains lead direction");
         touch.release(5,2650);
@@ -29,15 +31,23 @@ public final class HalfScreenControlsTest {
         touch.release(9,2660);
         check(touch.direction(2700)==0,"no fingers stops steering");
 
-        // Exactly 100 ms counts as simultaneous, later contacts do not.
+        // Up to 180 ms counts as a near-simultaneous stationary pair.
+        // Movement itself still starts after only 100 ms.
         touch.reset();
         touch.press(1,HalfScreenControls.LEFT,3000,true);
         check(touch.press(2,HalfScreenControls.RIGHT,3100,false),"100 ms triggers jump");
         check(touch.direction(3101)==0,"100 ms remains neutral");
         touch.reset();
         touch.press(1,HalfScreenControls.LEFT,4000,true);
-        check(touch.press(2,HalfScreenControls.RIGHT,4101,false),"101 ms still jumps");
-        check(touch.direction(4101)==HalfScreenControls.LEFT,"101 ms does not neutralize");
+        check(touch.direction(4101)==HalfScreenControls.LEFT,"101 ms: first touch already moves");
+        check(touch.press(2,HalfScreenControls.RIGHT,4180,false),"180 ms still jumps");
+        check(touch.isVerticalPair(),"180 ms accepted as vertical jump");
+        check(touch.direction(4180)==0,"180 ms freezes movement");
+        touch.reset();
+        touch.press(1,HalfScreenControls.LEFT,4500,true);
+        check(touch.press(2,HalfScreenControls.RIGHT,4681,false),"181 ms still jumps");
+        check(!touch.isVerticalPair(),"181 ms remains a rolling jump");
+        check(touch.direction(4681)==HalfScreenControls.LEFT,"181 ms retains lead steering");
         touch.reset();
 
         // Already moving: no start-up delay, opposite finger jumps while steering.

@@ -26,6 +26,7 @@ final class GameView extends View {
     private final android.content.SharedPreferences prefs;
     private boolean touchHalves=false,menuOpen=false;
     private float x,y,vx,vy,camX,camY,scale=1,lastDt=0;
+    private float twoFingerTakeoffX=0f;
     private float jumpBuffer,coyote,tipTime,messageTime,exitWarning,finishDelay,resetHold;
     private float checkpointX,checkpointY;
     private int checkpointColor,checkpointGravity,checkpointScore;
@@ -192,7 +193,11 @@ final class GameView extends View {
             if(resetHold>=2.5f){begin(false);msg("Level neu gestartet");return;}
         }else resetHold=0;
 
-        if(touchHalves)syncHalfMovement(android.os.SystemClock.uptimeMillis());
+        if(touchHalves){
+            syncHalfMovement(android.os.SystemClock.uptimeMillis());
+            // A simultaneous two-thumb jump must have no residual horizontal inertia.
+            if(halfControls.isVerticalPair())vx=0f;
+        }
         int command=(right.isEmpty()?0:1)-(left.isEmpty()?0:1);
         if(command!=0)vx+=command*(surface?1320f:860f)*dt;
         else vx*=Math.max(0,1-(surface?10f:3f)*dt);
@@ -711,7 +716,23 @@ final class GameView extends View {
         if(touchHalves){
             if(action==MotionEvent.ACTION_DOWN||action==MotionEvent.ACTION_POINTER_DOWN){
                 int side=e.getX(idx)<getWidth()*.5f?HalfScreenControls.LEFT:HalfScreenControls.RIGHT;
-                if(halfControls.press(e.getPointerId(idx),side,e.getEventTime(),surface&&Math.abs(vx)<8f))requestJump();
+                boolean startingAtRest=surface&&Math.abs(vx)<20f;
+                if(action==MotionEvent.ACTION_DOWN&&startingAtRest){
+                    twoFingerTakeoffX=x;
+                    // Tiny residual velocity must not displace a stationary takeoff.
+                    vx=0f;
+                }
+                boolean jumpNow=halfControls.press(e.getPointerId(idx),side,
+                        e.getEventTime(),startingAtRest);
+                if(jumpNow){
+                    if(halfControls.isVerticalPair()){
+                        // Restore the position if the second thumb arrived slightly
+                        // after movement began at the 100 ms boundary.
+                        x=twoFingerTakeoffX;
+                        vx=0f;
+                    }
+                    requestJump();
+                }
             }else if(action==MotionEvent.ACTION_MOVE){
                 for(int i=0;i<e.getPointerCount();i++){
                     int side=e.getX(i)<getWidth()*.5f?HalfScreenControls.LEFT:HalfScreenControls.RIGHT;

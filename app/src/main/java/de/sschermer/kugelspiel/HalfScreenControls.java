@@ -9,7 +9,12 @@ import java.util.HashMap;
  */
 final class HalfScreenControls {
     static final int LEFT=1,RIGHT=2;
-    static final long SIMULTANEOUS_WINDOW_MS=100L;
+    // First touch starts movement only after 100 ms when the ball is at rest.
+    static final long MOVEMENT_DELAY_MS=100L;
+    // Human two-thumb contacts can differ slightly more than the delay.
+    // A recent opposite touch still becomes a vertical jump, with x/vx
+    // restored to the original takeoff position by GameView.
+    static final long VERTICAL_PAIR_GRACE_MS=180L;
     private static final long RETAP_WINDOW_MS=260L;
     private final HashMap<Integer,Integer> sides=new HashMap<>();
     private int lead=-1,lastSide=0;
@@ -30,7 +35,7 @@ final class HalfScreenControls {
         sides.put(pointer,side);
         if(lead<0)lead=pointer;
         if(opposite&&pendingStandstill&&eventTime>=firstDown
-                &&eventTime-firstDown<=SIMULTANEOUS_WINDOW_MS){
+                &&eventTime-firstDown<=VERTICAL_PAIR_GRACE_MS){
             verticalPair=true;
             pendingStandstill=false;
         }
@@ -60,9 +65,10 @@ final class HalfScreenControls {
         if(side==null)return 0;
         if(verticalPair&&bothSides())return 0;
         if(pendingStandstill&&now>=firstDown
-                &&now-firstDown<SIMULTANEOUS_WINDOW_MS)return 0;
+                &&now-firstDown<MOVEMENT_DELAY_MS)return 0;
         return side;
     }
+    boolean isVerticalPair(){return verticalPair&&bothSides();}
     private boolean bothSides(){
         return sides.containsValue(LEFT)&&sides.containsValue(RIGHT);
     }
