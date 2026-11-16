@@ -36,6 +36,21 @@ final class HandcraftedLevels {
         for(int c=firstCol;c<firstCol+length;c++)
             if(c>2 && c<b.width-2)b.grid[row][c]='#';
     }
+    /**
+     * A wide naturally collapsed ceiling/floor, intentionally not the same
+     * size as the default three-tile connectors. Marks exactly the opening
+     * rather than drawing a falsely thick tunnel.
+     */
+    private static void gallery(LevelData.Builder b,int lane,int first,int last) {
+        if(lane>=b.stories-1 || last<first)throw new IllegalArgumentException("gallery");
+        for(int c=first;c<=last;c++) {
+            b.grid[b.floor(lane)][c]='.';
+            b.grid[b.roof(lane+1)][c]='.';
+        }
+        float top=b.floorY(lane);
+        b.shafts.add(new LevelData.Shaft(first*T,(last+1)*T,top,
+                b.ceilingY(lane+1),true));
+    }
     /** A genuine full-height stone obstacle, not a decorative 19-unit ledge. */
     private static void rock(LevelData.Builder b,int lane,int column,int heightTiles){
         for(int h=1;h<=heightTiles;h++)
@@ -62,6 +77,8 @@ final class HandcraftedLevels {
         b.shaft(1,11,true);
         b.shaft(1,27,true);
         b.shaft(1,47,true);
+        gallery(b,0,31,35);  // wide upper cave drop, not a narrow shaft
+        gallery(b,1,34,41);  // broad lower cavern changes the floor plan
 
         token(b,0,7.5f,1);
         token(b,0,11.5f,5);
@@ -69,7 +86,7 @@ final class HandcraftedLevels {
         token(b,0,22.5f,10);
         rock(b,0,24,1);  // physical rock step can be jumped
         gate(b,0,29.5f,LevelData.ORANGE);
-        token(b,0,32.5f,5);
+        token(b,0,36.0f,5);
         pointsDoor(b,0,37.5f,16); // alternative: descend before the door
         token(b,0,45.5f,1);
         checkpoint(b,0,44.5f);
@@ -81,7 +98,7 @@ final class HandcraftedLevels {
         ceilingToken(b,1,22.5f,5);
         token(b,1,25.5f,10);
         pigment(b,1,30.5f,LevelData.BLUE);
-        gate(b,1,36.5f,LevelData.BLUE);
+        gate(b,1,32.5f,LevelData.BLUE);
         token(b,1,42.5f,1);
         checkpoint(b,1,39.5f);
 
@@ -114,6 +131,9 @@ final class HandcraftedLevels {
         b.shaft(2,11,true);
         b.shaft(2,41,true);
         b.shaft(2,55,true);
+        gallery(b,0,44,48); // optional long drop behind colored gate
+        gallery(b,1,31,34); // separate open balcony
+        gallery(b,2,30,35); // tower mid-floor is discontinuous
 
         token(b,0,7.5f,1);
         token(b,0,11.5f,5);
@@ -124,7 +144,7 @@ final class HandcraftedLevels {
         b.point(x(27.0f),b.floorY(0)-3*T-24,10);
         pigment(b,0,31.5f,LevelData.VIOLET);
         gate(b,0,39.5f,LevelData.VIOLET);
-        token(b,0,47.5f,5);
+        token(b,0,58.5f,5);
 
         token(b,1,14.5f,1);
         token(b,1,19.5f,5);
@@ -183,6 +203,8 @@ final class HandcraftedLevels {
         b.shaft(2,10,true);
         b.shaft(2,31,true);
         b.shaft(2,61,true);
+        gallery(b,1,24,27);  // left-side collapsed balcony
+        gallery(b,2,67,70);  // right-side high bonus route
 
         // Left section: 37 collectible points, insufficient to finish.
         token(b,0,7.5f,1);
@@ -213,6 +235,7 @@ final class HandcraftedLevels {
         token(b,2,65.5f,5);
         token(b,3,50.5f,5);
         token(b,3,69.5f,1);
+        token(b,3,61.5f,10); // high-value return route on the far side
         checkpoint(b,1,62.5f);
         checkpoint(b,3,34.5f);
         b.heliumStation(2,x(60.5f),true);
