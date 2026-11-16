@@ -43,7 +43,7 @@ final class GameView extends View {
     GameView(Context context) {
         super(context);
         prefs=context.getSharedPreferences("kugelspiel_progress",Context.MODE_PRIVATE);
-        level=Math.max(0,Math.min(LevelData.LEVELS.size()-1,prefs.getInt("level",0)));
+        level=Math.max(0,Math.min(LevelData.LEVELS.size()-1,prefs.getInt("level_003",0)));
         beginLevel(false);
         setFocusable(true);
     }
@@ -67,7 +67,7 @@ final class GameView extends View {
         complete=false;titleTime=3;goalToastCooldown=0;toastTime=0;
         camX=-90;camY=0;
         left.clear();right.clear();jump.clear();
-        prefs.edit().putInt("level",level).apply();
+        prefs.edit().putInt("level_003",level).apply();
     }
     private void atCheckpoint(int i) {
         if(checkpointUsed[i])return;
@@ -86,8 +86,8 @@ final class GameView extends View {
     }
     private void message(String msg){toast=msg;toastTime=1.65f;}
     private void finishLevel() {
-        int old=prefs.getInt("best_"+level,0);
-        if(score>old)prefs.edit().putInt("best_"+level,score).apply();
+        int old=prefs.getInt("best_003_"+level,0);
+        if(score>old)prefs.edit().putInt("best_003_"+level,score).apply();
         if(level==LevelData.LEVELS.size()-1){
             complete=true;finishTime=0;message("Alle zehn Level geschafft!");
         } else {
@@ -491,7 +491,7 @@ final class GameView extends View {
         }
         paint.setTextSize(15);paint.setColor(0xffabcad2);
         c.drawText("FARBE: "+colorName(color)+"    GRAVITATION: "+(gravity==LevelData.UP?"↑":"↓"),27,hh-20,paint);
-        int best=prefs.getInt("best_"+level,0);
+        int best=prefs.getInt("best_003_"+level,0);
         paint.setTextAlign(Paint.Align.RIGHT);
         c.drawText("BESTWERT "+best+"     ← + → 2,5 s: Neustart",ww-26,hh-20,paint);
         paint.setTextAlign(Paint.Align.LEFT);
