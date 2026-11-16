@@ -69,11 +69,12 @@ final class CuratedWorlds {
         dye(b,0,26.5f,LevelData.ORANGE);gate(b,0,32.5f,LevelData.ORANGE);
         p(b,0,41.5f,5);p(b,0,49.5f,1);
 
-        p(b,1,5.5f,1);gravityUp(b,1,8.5f);
-        // Twelve adjacent tiles of lethal floor force ceiling traversal.
-        for(int c=20;c<=29;c+=3)b.lethalPit(1,c);
-        high(b,1,24.5f,10);high(b,1,29.5f,5);
-        gravityDownCeiling(b,1,37.5f);
+        p(b,1,5.5f,1);gravityUp(b,1,15.5f);
+        // The first ceiling entrance is BEHIND the inversion switch.
+        // Twelve adjacent lethal tiles cannot be crossed by a 250% jump.
+        for(int c=23;c<=32;c+=3)b.lethalPit(1,c);
+        high(b,1,27.5f,10);high(b,1,32.5f,5);
+        gravityDownCeiling(b,1,39.5f);
         p(b,1,40.5f,5);p(b,1,46.5f,1);save(b,1,43.5f);
 
         p(b,2,8.5f,1);p(b,2,16.5f,5);
@@ -183,7 +184,8 @@ final class CuratedWorlds {
                 "Das Resonanzlabyrinth",
                 "Jede Marke zählt. Finde den Weg zwischen zwei Maschinen.");
         b.shaft(0,12,true);b.shaft(0,59,true);gallery(b,0,21,25);
-        b.shaft(1,15,true);b.shaft(1,54,true);gallery(b,1,42,47);
+        b.shaft(1,15,true);b.shaft(1,54,true);
+        // No intermediate roof opening across the later ceiling-travel puzzle.
         b.shaft(2,12,true);b.shaft(2,59,true);
         b.shaft(3,18,true);b.shaft(3,45,true);b.shaft(3,62,true);
         b.shaft(4,13,true);gallery(b,4,42,49);gallery(b,4,25,30);
@@ -203,11 +205,12 @@ final class CuratedWorlds {
         p(b,1,40.5f,1);p(b,1,50.5f,5);p(b,1,63.5f,1);
 
         p(b,2,7.5f,1);
-        gravityUp(b,2,10.5f);
-        // Twelve-tile bottom hazard; switch to ceiling travel first.
-        for(int c=23;c<=32;c+=3)b.lethalPit(2,c);
-        high(b,2,27.5f,10);high(b,2,32.5f,5);
-        gravityDownCeiling(b,2,39.5f);
+        gravityUp(b,2,18.5f);
+        // Invert after the rear shaft; cross a twelve-tile deadly floor
+        // entirely on the underside, then find the reverse switch.
+        for(int c=27;c<=36;c+=3)b.lethalPit(2,c);
+        high(b,2,30.5f,10);high(b,2,35.5f,5);
+        gravityDownCeiling(b,2,47.5f);
         p(b,2,44.5f,1);p(b,2,53.5f,5);
         save(b,2,47.5f);
 
