@@ -23,6 +23,15 @@ jobs:
           javac -encoding UTF-8 -d /tmp/kugelspiel-check app/src/main/java/de/sschermer/kugelspiel/LevelData.java app/src/main/java/de/sschermer/kugelspiel/HandcraftedLevels.java app/src/main/java/de/sschermer/kugelspiel/CuratedWorlds.java tools/LevelRouteTest.java app/src/main/java/de/sschermer/kugelspiel/BounceChain.java tools/BounceChainTest.java
           java -cp /tmp/kugelspiel-check de.sschermer.kugelspiel.LevelRouteTest
           java -cp /tmp/kugelspiel-check de.sschermer.kugelspiel.BounceChainTest
+      - name: Render level maps for design review
+        run: |
+          javac -encoding UTF-8 -cp /tmp/kugelspiel-check -d /tmp/kugelspiel-check tools/LevelPreview.java
+          java -Djava.awt.headless=true -cp /tmp/kugelspiel-check de.sschermer.kugelspiel.LevelPreview /tmp/kugelspiel-previews
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kugelspiel-iteration-008-level-overviews
+          path: /tmp/kugelspiel-previews/level_*.png
+          if-no-files-found: error
       - name: Install Android SDK platform
         run: |
           SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | head -n 1)
