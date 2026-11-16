@@ -48,11 +48,15 @@ final class HandcraftedLevels {
         b.shaft(1,9,true);b.shaft(1,27,true);gallery(b,1,33,37);
         p(b,0,6.5f,1);p(b,0,9.5f,5);
         dye(b,0,15.5f,LevelData.ORANGE);
+        // Full-height fork. The upper prize chamber is reached from below
+        // via the adjacent gallery, not by a long level corridor.
+        rock(b,0,16,4);
         ledge(b,0,17,2,2,10);
         gate(b,0,26.5f,LevelData.ORANGE);
         p(b,0,33.5f,5);p(b,0,39.5f,1);
         p(b,1,6.5f,5);p(b,1,12.5f,1);
         rock(b,1,16,1);ledge(b,1,18,3,2,10);
+        rock(b,1,23,2);
         dye(b,1,24.5f,LevelData.BLUE);
         gate(b,1,31.5f,LevelData.BLUE);
         p(b,1,39.5f,5);save(b,1,36.5f);
@@ -79,16 +83,18 @@ final class HandcraftedLevels {
 
         p(b,1,7.5f,5);p(b,1,15.5f,1);
         ledge(b,1,20,3,2,10);
+        rock(b,1,26,3);
         door(b,1,29.5f,18);
         p(b,1,34.5f,5);p(b,1,41.5f,1);save(b,1,38.5f);
 
         p(b,2,7.5f,1);p(b,2,17.5f,5);
+        rock(b,2,20,4); // go around via two different vertical links
         ledge(b,2,28,3,3,10);
         p(b,2,34.5f,5);rock(b,2,39,1);p(b,2,44.5f,1);
 
         p(b,3,8.5f,5);p(b,3,18.5f,1);
         ledge(b,3,23,2,2,10);
-        p(b,3,32.5f,5);p(b,3,40.5f,1);p(b,3,44.5f,5);
+        p(b,3,32.5f,5);rock(b,3,36,1);p(b,3,40.5f,1);p(b,3,44.5f,5);
         return b.build();
     }
     /** Split map: left has enough to open score doors; right has mandatory prizes. */
@@ -104,19 +110,19 @@ final class HandcraftedLevels {
         b.shaft(2,35,true);b.shaft(2,45,true);gallery(b,2,14,17);
 
         p(b,0,6.5f,1);p(b,0,13.5f,5);
-        ledge(b,0,16,3,2,10);p(b,0,23.5f,5);
+        ledge(b,0,16,3,2,10);rock(b,0,21,2);p(b,0,23.5f,5);
         p(b,0,31.5f,1);dye(b,0,35.5f,LevelData.BLUE);
         gate(b,0,40.5f,LevelData.BLUE);p(b,0,46.5f,5);
 
-        p(b,1,8.5f,1);p(b,1,16.5f,5);p(b,1,23.5f,1);
+        p(b,1,8.5f,1);p(b,1,16.5f,5);p(b,1,23.5f,1);rock(b,1,25,2);
         p(b,1,32.5f,5);ledge(b,1,38,3,2,10);
         b.lethalPit(1,43);p(b,1,47.5f,1);
 
-        p(b,2,7.5f,5);p(b,2,19.5f,1);p(b,2,24.5f,5);
+        p(b,2,7.5f,5);p(b,2,19.5f,1);p(b,2,24.5f,5);rock(b,2,30,2);
         p(b,2,32.5f,1);p(b,2,41.5f,5);p(b,2,47.5f,1);
         save(b,2,34.5f);
 
-        p(b,3,8.5f,1);p(b,3,15.5f,5);p(b,3,23.5f,1);
+        p(b,3,8.5f,1);p(b,3,15.5f,5);p(b,3,23.5f,1);rock(b,3,30,1);
         p(b,3,33.5f,5);ledge(b,3,39,3,2,10);
         p(b,3,47.5f,5);
         return b.build();
