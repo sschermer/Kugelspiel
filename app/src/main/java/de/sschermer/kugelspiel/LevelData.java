@@ -128,7 +128,7 @@ final class LevelData {
         }
         void heliumStation(int lane,float x,boolean fill){
             float y=fill?floorY(lane)-15:ceilingY(lane)+15;
-            items.add(new Item(x,y,fill?HELIUM_FILL:HELIUM_DRAIN,0));
+            items.add(new Item(x,y,fill?HELIUM_FILL:HELIUM_DRAIN,fill?Math.max(6,lane*6):0));
         }
         /** Three staggered functional platforms; missing middle step changes route choice. */
         void brokenStairs(int lane,float fraction,boolean ascending){
@@ -246,6 +246,7 @@ final class LevelData {
                         // back to the upper floor is available through a helium socket.
                         // Both apparatuses require careful centering and low speed.
                         float socketX=(mainCenter+.5f)*TILE;
+                        // Helium ascent is gated by points from previous rooms.
                         b.heliumStation(lane+1,socketX,true);
                         b.heliumStation(lane,socketX+3*TILE,false);
                     }
