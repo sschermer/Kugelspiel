@@ -45,7 +45,9 @@ final class LevelData {
         final List<float[]> checkpoints;
         final float startX,startY,exitX,exitY;
         Level(Builder b){
-            columns=b.width;stories=b.stories;rows=b.rows;target=b.target;
+            columns=b.width;stories=b.stories;rows=b.rows;
+            int total=0;for(Item item:b.items)if(item.type==POINT)total+=item.value;
+            target=total; // NEVER a lower threshold: all collectible points are mandatory.
             name=b.name;tip=b.tip;
             tiles=new char[rows][columns];
             for(int r=0;r<rows;r++)System.arraycopy(b.grid[r],0,tiles[r],0,columns);
@@ -61,6 +63,7 @@ final class LevelData {
             if(row>=rows)return false;
             return tiles[row][col]=='#' || tiles[row][col]=='X';
         }
+        int collectibleCount(){int n=0;for(Item item:items)if(item.type==POINT)n++;return n;}
         int pointsAvailable(){
             int sum=0;for(Item item:items)if(item.type==POINT)sum+=item.value;
             return sum;
@@ -210,6 +213,10 @@ final class LevelData {
             if(index==3){result.add(HandcraftedLevels.caves());continue;}
             if(index==4){result.add(HandcraftedLevels.tower());continue;}
             if(index==5){result.add(HandcraftedLevels.twoWorlds());continue;}
+            if(index==6){result.add(CuratedWorlds.gravityCorridor());continue;}
+            if(index==7){result.add(CuratedWorlds.heliumWorks());continue;}
+            if(index==8){result.add(CuratedWorlds.colorLocks());continue;}
+            if(index==9){result.add(CuratedWorlds.finalLabyrinth());continue;}
             int height=stories[index];
             int target=(index<2?6:(height*7)+Math.max(0,height-2)*4);
             Builder b=new Builder(widths[index],height,target,names[index],tips[index]);
