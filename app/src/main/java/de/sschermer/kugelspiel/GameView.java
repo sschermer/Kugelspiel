@@ -303,15 +303,16 @@ final class GameView extends View {
         int y0=Math.max(0,(int)Math.floor(camY/TILE)-2),y1=Math.min(world().rows-1,(int)Math.ceil((camY+vh)/TILE)+2);
         for(int row=y0;row<=y1;row++)for(int col=x0;col<=x1;col++){
             if(world().tiles[row][col]!='#')continue;
-            float a=col*TILE,b=row*TILE;
-            p.setShader(new LinearGradient(a,b,a,b+TILE,0xff839ba9,0xff304b5b,Shader.TileMode.CLAMP));
-            c.drawRect(a,b,a+TILE,b+TILE,p);p.setShader(null);
-            p.setColor(0xff91b0ba);
-            c.drawRect(a,b,a+TILE,b+3,p);
+            float a=col*TILE,top=tileTop(col,row),bottom=tileBottom(col,row);
+            p.setShader(new LinearGradient(a,top,a,bottom,0xff91a9b7,0xff355262,Shader.TileMode.CLAMP));
+            c.drawRect(a,top,a+TILE,bottom,p);p.setShader(null);
+            p.setColor(0xffa5c4cc);c.drawRect(a,top,a+TILE,top+Math.min(3,bottom-top),p);
             p.setColor(0x66597889);
-            c.drawRect(a+TILE-3,b,a+TILE,b+TILE,p);
-            p.setColor(0x6650707b);
-            c.drawRect(a+10,b+TILE-12,a+TILE-10,b+TILE-10,p);
+            c.drawRect(a+TILE-3,top,a+TILE,bottom,p);
+            if(bottom-top>12){
+                p.setColor(0x666e8995);
+                c.drawRect(a+8,bottom-5,a+TILE-8,bottom-3,p);
+            }
         }
     }
     private void shafts(Canvas c){
@@ -390,6 +391,20 @@ final class GameView extends View {
         for(float yy=g.top+33;yy<g.bottom-8;yy+=64)c.drawText(colorLetter(g.color),g.x,yy,p);
         p.setTextAlign(Paint.Align.LEFT);
     }
+    private void drawScoreGate(Canvas c,LevelData.ScoreGate g){
+        boolean unlocked=!g.blocks(score);
+        p.setColor(unlocked?0x334affbf:0xe6d57e52);
+        c.drawRoundRect(new RectF(g.x-13,g.top,g.x+13,g.bottom),6,6,p);
+        p.setColor(unlocked?0xff63f0bd:0xffffd38f);
+        p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(unlocked?2:4);
+        c.drawRoundRect(new RectF(g.x-13,g.top,g.x+13,g.bottom),6,6,p);
+        p.setStyle(Paint.Style.FILL);
+        String text=unlocked?"OFFEN":"NOCH "+(g.threshold-score);
+        p.setTypeface(Typeface.DEFAULT_BOLD);p.setTextAlign(Paint.Align.CENTER);
+        p.setTextSize(17);p.setColor(0xfff5ffff);
+        c.drawText(text,g.x,(g.top+g.bottom)*.5f,p);
+        p.setTextAlign(Paint.Align.LEFT);
+    }
     private void drawItem(Canvas c,LevelData.Item item,boolean collected){
         float xx=item.x,yy=item.y;
         if(item.type==LevelData.COLOR) {
@@ -413,6 +428,38 @@ final class GameView extends View {
             p.setColor(0xffffffff);p.setTextSize(35);p.setTypeface(Typeface.DEFAULT_BOLD);
             c.drawText(item.value==LevelData.UP?"↑":"↓",xx,yy+12,p);
             p.setTextAlign(Paint.Align.LEFT);
+        }else if(item.type==LevelData.HELIUM_FILL ||
+                item.type==LevelData.HELIUM_DRAIN){
+            boolean fill=item.type==LevelData.HELIUM_FILL;
+            boolean active=fill?!helium:helium;
+            int accent=fill?0xff34e8ff:0xffffce82;
+            // Real U-shaped, functional machine recess.
+            p.setColor(0xff102d3d);
+            c.drawRoundRect(new RectF(xx-34,yy-25,xx+34,yy+25),9,9,p);
+            p.setColor(accent);p.setStrokeWidth(5);p.setStyle(Paint.Style.STROKE);
+            Path socket=new Path();
+            if(fill){
+                socket.moveTo(xx-27,yy-22);socket.lineTo(xx-27,yy+21);
+                socket.quadTo(xx,yy+31,xx+27,yy+21);
+                socket.lineTo(xx+27,yy-22);
+            }else{
+                socket.moveTo(xx-27,yy+22);socket.lineTo(xx-27,yy-21);
+                socket.quadTo(xx,yy-31,xx+27,yy-21);
+                socket.lineTo(xx+27,yy+22);
+            }
+            c.drawPath(socket,p);p.setStyle(Paint.Style.FILL);
+            p.setColor(active?0xfff8ffff:0xffa5c2c8);
+            p.setTypeface(Typeface.DEFAULT_BOLD);p.setTextSize(16);
+            p.setTextAlign(Paint.Align.CENTER);
+            c.drawText(fill?"HE+":"HE-",xx,yy+6,p);
+            p.setTextAlign(Paint.Align.LEFT);
+            if(activeStation>=0 && world().items.get(activeStation)==item) {
+                p.setColor(accent);p.setStrokeWidth(5);
+                p.setStyle(Paint.Style.STROKE);
+                c.drawArc(new RectF(xx-39,yy-39,xx+39,yy+39),
+                        -90,360*clamp(charge/.55f,0,1),false,p);
+                p.setStyle(Paint.Style.FILL);
+            }
         } else {
             // Not collected: black with white number.
             // Collected: semi-transparent white with black number, never awarded twice.
@@ -461,6 +508,16 @@ final class GameView extends View {
                 new int[]{0xffffffff,0xffe8faff,bright,base},
                 new float[]{0,.27f,.49f,1},Shader.TileMode.CLAMP));
         c.drawCircle(x,y,R,p);p.setShader(null);
+        if(helium) {
+            p.setColor(0x554fffea);
+            p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(3);
+            c.drawCircle(x,y,R+5,p);p.setStyle(Paint.Style.FILL);
+        }
+        // Four tiny functional pips: baseline + up to three stacked boosts.
+        for(int i=0;i<bounce.boosts;i++){
+            p.setColor(0xffffe58b);
+            c.drawCircle(x+(i-1)*8,y+R+7,2.8f,p);
+        }
         c.save();c.rotate(x*180f/(float)Math.PI/R,x,y);
         p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(2.6f);p.setColor(0xb1f4ffff);
         c.drawArc(new RectF(x-11,y-11,x+11,y+11),28,135,false,p);
@@ -480,6 +537,11 @@ final class GameView extends View {
         while(subtitle.length()>10&&p.measureText(subtitle)>vw-50)
             subtitle=subtitle.substring(0,subtitle.length()-2);
         c.drawText(subtitle,24,58,p);
+        p.setColor(helium?0xff8effe1:0xffffe6aa);
+        p.setTypeface(Typeface.DEFAULT_BOLD);
+        p.setTextAlign(Paint.Align.RIGHT);p.setTextSize(16);
+        c.drawText(helium?"HELIUM ↑":"SPRUNG "+Math.round(bounce.currentHeight()*100)+" %",vw-26,59,p);
+        p.setTextAlign(Paint.Align.LEFT);
         float leftMargin=28,rightMargin=vw-28;
         p.setColor(0x99567785);c.drawRoundRect(new RectF(leftMargin,76,rightMargin,83),4,4,p);
         float factor=clamp(x/(world().columns*TILE),0,1);
