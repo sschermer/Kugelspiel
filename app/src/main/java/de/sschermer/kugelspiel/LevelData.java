@@ -13,6 +13,7 @@ final class LevelData {
     static final int DOWN=1, UP=-1;
     static final int COLOR=1, GRAVITY=2, POINT=3, HELIUM_FILL=4, HELIUM_DRAIN=5;
     static final int TILE=58;
+    static final int DIVIDER_THICKNESS=19; // Actual collision & visible thickness
     static final class Item {
         final float x,y; final int type,value;
         Item(float x,float y,int type,int value){this.x=x;this.y=y;this.type=type;this.value=value;}
@@ -95,10 +96,10 @@ final class LevelData {
             exitX=(endCol+.5f)*TILE;
             exitY=floor(stories-1)*TILE-92;
         }
-        int floor(int lane){return 6+6*lane;}
+        int floor(int lane){return 6+5*lane;} // Adjacent storeys share one divider row
         int roof(int lane){return floor(lane)-5;}
         float floorY(int lane){return floor(lane)*TILE;}
-        float ceilingY(int lane){return (roof(lane)+1)*TILE;}
+        float ceilingY(int lane){return lane==0?(roof(lane)+1)*TILE : floorY(lane-1)+DIVIDER_THICKNESS;}
         float pathX(int lane,float fraction){
             float from=5.5f, to=width-6.5f;
             return (lane%2==0?from+(to-from)*fraction:to-(to-from)*fraction)*TILE;
@@ -120,11 +121,11 @@ final class LevelData {
         }
         void gate(int lane,float fraction,int color){
             float x=pathX(lane,fraction);
-            gates.add(new Gate(x,floorY(lane)-183,floorY(lane)-4,color));
+            gates.add(new Gate(x,ceilingY(lane),floorY(lane),color)); // full unobstructed room height
         }
         void scoreGate(int lane,float fraction,int threshold) {
             float x=pathX(lane,fraction);
-            scoreGates.add(new ScoreGate(x,floorY(lane)-172,floorY(lane)-4,threshold));
+            scoreGates.add(new ScoreGate(x,ceilingY(lane),floorY(lane),threshold));
         }
         void heliumStation(int lane,float x,boolean fill){
             float y=fill?floorY(lane)-15:ceilingY(lane)+15;
@@ -155,15 +156,15 @@ final class LevelData {
         }
         void shaft(int lane,int center,boolean safe){
             if(lane>=stories-1)return;
-            int left=Math.max(3,Math.min(width-6,center-2));
-            int right=left+4;
+            int left=Math.max(3,Math.min(width-5,center-1));
+            int right=left+2; // 3 tiles wide, instead of 5
             // Both structural barrier rows must be open.
             for(int col=left;col<=right;col++){
                 grid[floor(lane)][col]='.';
                 grid[roof(lane+1)][col]='.';
             }
             float top=floor(lane)*TILE;
-            float bottom=(roof(lane+1)+1)*TILE;
+            float bottom=ceilingY(lane+1); // same thin 19-unit divider
             shafts.add(new Shaft(left*TILE,(right+1)*TILE,top,bottom,safe));
         }
         void lethalPit(int lane,int col){
@@ -174,7 +175,7 @@ final class LevelData {
                 if(lane<stories-1)grid[roof(lane+1)][i]='.';
             }
             float y=floorY(lane);
-            shafts.add(new Shaft(left*TILE,(left+3)*TILE,y,y+TILE*1.8f,false));
+            shafts.add(new Shaft(left*TILE,(left+3)*TILE,y,y+DIVIDER_THICKNESS,false));
         }
         void checkpoint(int lane,float fraction){
             checkpoints.add(new float[]{pathX(lane,fraction),floorY(lane)-22});
