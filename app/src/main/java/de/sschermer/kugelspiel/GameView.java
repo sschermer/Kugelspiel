@@ -224,6 +224,7 @@ final class GameView extends View {
             LevelData.Item item=world().items.get(i);
             if(item.type!=LevelData.HELIUM_FILL&&item.type!=LevelData.HELIUM_DRAIN)continue;
             boolean modeFits=item.type==LevelData.HELIUM_FILL?!helium:helium;
+            if(item.type==LevelData.HELIUM_FILL && score<item.value)modeFits=false;
             if(modeFits && Math.abs(x-item.x)<10 && Math.abs(y-item.y)<19
                     && Math.abs(vx)<27 && Math.abs(vy)<30) {station=i;break;}
         }
@@ -452,6 +453,11 @@ final class GameView extends View {
             p.setTypeface(Typeface.DEFAULT_BOLD);p.setTextSize(16);
             p.setTextAlign(Paint.Align.CENTER);
             c.drawText(fill?"HE+":"HE-",xx,yy+6,p);
+            if(fill && score<item.value){
+                p.setColor(0xffffd19d);
+                p.setTextSize(14);
+                c.drawText("NOCH "+(item.value-score),xx,yy-36,p);
+            }
             p.setTextAlign(Paint.Align.LEFT);
             if(activeStation>=0 && world().items.get(activeStation)==item) {
                 p.setColor(accent);p.setStrokeWidth(5);
