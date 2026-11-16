@@ -238,8 +238,8 @@ final class HandcraftedLevels {
         token(b,3,61.5f,10); // high-value return route on the far side
         checkpoint(b,1,62.5f);
         checkpoint(b,3,34.5f);
-        b.heliumStation(2,x(60.5f),true);
-        b.items.add(new LevelData.Item(x(60.5f),roof(b,1),
+        b.heliumStation(2,x(56.5f),true);
+        b.items.add(new LevelData.Item(x(64.5f),roof(b,1),
                 LevelData.HELIUM_DRAIN,0));
 
         return b.build();
