@@ -18,14 +18,19 @@ import java.util.Locale;
 /** Native Canvas renderer and platform physics for layered tile mazes. */
 final class GameView extends View {
     private static final float TILE=LevelData.TILE, R=15f, G=950f;
-    private static final float JUMP=490f, SPEED=266f, STEP=1f/120f;
+    private static final float JUMP=490f, SPEED=266f, STEP=1f/120f, HOP=157f;
     private final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final BounceChain bounce=new BounceChain();
     private final HashSet<Integer> left=new HashSet<>(),right=new HashSet<>(),jump=new HashSet<>();
     private final android.content.SharedPreferences prefs;
     private float x,y,vx,vy,camX,camY,scale=1,lastDt=0;
     private float jumpBuffer,coyote,tipTime,messageTime,exitWarning,finishDelay,resetHold;
     private float checkpointX,checkpointY;
     private int checkpointColor,checkpointGravity,checkpointScore;
+    private boolean checkpointHelium=false;
+    private boolean helium=false;
+    private int activeStation=-1;
+    private float charge=0;
     private int color=LevelData.NONE,gravity=LevelData.DOWN,score=0,level=0;
     private boolean surface=true,paused=false,complete=false,hasCheckpoint=false;
     private boolean[] collected=new boolean[0],snapshot=new boolean[0];
@@ -35,7 +40,7 @@ final class GameView extends View {
     GameView(Context context) {
         super(context);
         prefs=context.getSharedPreferences("kugelspiel_progress",Context.MODE_PRIVATE);
-        level=Math.max(0,Math.min(9,prefs.getInt("level_004",0)));
+        level=Math.max(0,Math.min(9,prefs.getInt("level_005",0)));
         begin(false);
         setFocusable(true);
     }
@@ -48,14 +53,15 @@ final class GameView extends View {
         if(first)level=0;
         LevelData.Level w=world();
         x=w.startX;y=w.startY;vx=vy=0;gravity=LevelData.DOWN;color=LevelData.NONE;
-        score=0;hasCheckpoint=false;checkpointScore=0;
+        score=0;hasCheckpoint=false;checkpointScore=0;helium=false;checkpointHelium=false;
+        activeStation=-1;charge=0;bounce.reset();
         checkpointX=x;checkpointY=y;checkpointColor=color;checkpointGravity=gravity;
         collected=new boolean[w.items.size()];snapshot=collected.clone();
         surface=true;complete=false;finishDelay=0;resetHold=0;jumpBuffer=0;coyote=.14f;
         tipTime=4.5f;messageTime=0;exitWarning=0;
         camX=0;camY=0;
         left.clear();right.clear();jump.clear();
-        prefs.edit().putInt("level_004",level).apply();
+        prefs.edit().putInt("level_005",level).apply();
     }
     private void msg(String t) {message=t;messageTime=1.65f;}
     private void checkpoint(float px,float py) {
@@ -63,18 +69,20 @@ final class GameView extends View {
         hasCheckpoint=true;
         checkpointX=px;checkpointY=py;
         checkpointColor=color;checkpointGravity=gravity;checkpointScore=score;
+        checkpointHelium=helium;
         snapshot=collected.clone();
         msg("Checkpoint gespeichert");
     }
     private void death() {
         x=checkpointX;y=checkpointY;vx=vy=0;
-        gravity=checkpointGravity;color=checkpointColor;score=checkpointScore;
+        gravity=checkpointGravity;color=checkpointColor;score=checkpointScore;helium=checkpointHelium;
+        activeStation=-1;charge=0;bounce.reset();
         collected=snapshot.clone();surface=true;jumpBuffer=0;coyote=.14f;
         msg(hasCheckpoint?"Zurück zum Checkpoint":"Zurück zum Start");
     }
     private void next() {
-        int old=prefs.getInt("best_004_"+level,0);
-        if(score>old)prefs.edit().putInt("best_004_"+level,score).apply();
+        int old=prefs.getInt("best_005_"+level,0);
+        if(score>old)prefs.edit().putInt("best_005_"+level,score).apply();
         if(level==9){complete=true;finishDelay=0;msg("Alle Labyrinthe geschafft!");}
         else{level++;begin(false);}
     }
@@ -83,48 +91,82 @@ final class GameView extends View {
         return (ax-bx)*(ax-bx)+(ay-by)*(ay-by)<rad*rad;
     }
 
+    /** Structural floors/ceilings are only 19 units thick (was 58). */
+    private float tileTop(int col,int row) {
+        if(row<0 || col<2 || col>=world().columns-2) return row*TILE;
+        if(row%6==1)return (row+1)*TILE-19; // underside of ceiling
+        return row*TILE;                    // floor or intermediate step
+    }
+    private float tileBottom(int col,int row) {
+        if(row<0 || col<2 || col>=world().columns-2)return (row+1)*TILE;
+        if(row%6==1)return (row+1)*TILE;
+        return row*TILE+19;
+    }
     private void moveHorizontal(float d) {
-        if(Math.abs(d)<.0001f)return;
+        if(Math.abs(d)<.00001f)return;
         x+=d;
         int leftCol=(int)Math.floor((x-R)/TILE),rightCol=(int)Math.floor((x+R)/TILE);
         int upRow=(int)Math.floor((y-R)/TILE),lowRow=(int)Math.floor((y+R)/TILE);
-        for(int r=upRow;r<=lowRow;r++)for(int c=leftCol;c<=rightCol;c++) {
-            if(!world().solid(c,r))continue;
-            float a=c*TILE,b=(c+1)*TILE;
-            if(x+R>a && x-R<b && y+R>r*TILE && y-R<(r+1)*TILE) {
+        for(int row=upRow;row<=lowRow;row++)for(int col=leftCol;col<=rightCol;col++){
+            if(!world().solid(col,row))continue;
+            float a=col*TILE,b=(col+1)*TILE;
+            if(x+R>a && x-R<b && y+R>tileTop(col,row) && y-R<tileBottom(col,row)){
                 if(d>0)x=a-R;else x=b+R;
                 vx=0;
             }
         }
         for(LevelData.Gate gate:world().gates) {
             if(gate.color==color)continue;
-            if(y+R<=gate.top || y-R>=gate.bottom)continue;
+            if(y+R<=gate.top||y-R>=gate.bottom)continue;
             float a=gate.x-12,b=gate.x+12;
+            if(x+R>a&&x-R<b){x=d>0?a-R:b+R;vx=0;}
+        }
+        for(LevelData.ScoreGate gate:world().scoreGates){
+            if(!gate.blocks(score))continue;
+            if(y+R<=gate.top||y-R>=gate.bottom)continue;
+            float a=gate.x-13,b=gate.x+13;
             if(x+R>a&&x-R<b) {
-                if(d>0)x=a-R;else x=b+R;
-                vx=0;
+                x=d>0?a-R:b+R;vx=0;
+                if(exitWarning<=0){
+                    msg("Zwischentür: Noch "+(gate.threshold-score)+" Punkte");
+                    exitWarning=2;
+                }
             }
         }
     }
     private void moveVertical(float d) {
+        boolean wasSurface=surface;
+        float impactSpeed=Math.abs(vy);
         surface=false;
         y+=d;
         int leftCol=(int)Math.floor((x-R)/TILE),rightCol=(int)Math.floor((x+R)/TILE);
         int upRow=(int)Math.floor((y-R)/TILE),lowRow=(int)Math.floor((y+R)/TILE);
-        for(int r=upRow;r<=lowRow;r++)for(int c=leftCol;c<=rightCol;c++) {
-            if(!world().solid(c,r))continue;
-            float top=r*TILE,bottom=(r+1)*TILE,leftEdge=c*TILE,rightEdge=(c+1)*TILE;
-            if(x+R<=leftEdge||x-R>=rightEdge||y+R<=top||y-R>=bottom)continue;
-            if(d>=0) {
+        boolean onLanding=false,hitHead=false;
+        for(int row=upRow;row<=lowRow;row++)for(int col=leftCol;col<=rightCol;col++){
+            if(!world().solid(col,row))continue;
+            float top=tileTop(col,row),bottom=tileBottom(col,row);
+            float a=col*TILE,b=(col+1)*TILE;
+            if(x+R<=a||x-R>=b||y+R<=top||y-R>=bottom)continue;
+            if(d>=0){
                 y=top-R;
-                if(gravity==LevelData.DOWN)surface=true;
+                if(gravity==LevelData.DOWN && !helium){surface=true;onLanding=true;}
+                else hitHead=true;
             } else {
                 y=bottom+R;
-                if(gravity==LevelData.UP)surface=true;
+                if(gravity==LevelData.UP||helium){surface=true;onLanding=true;}
+                else hitHead=true;
             }
             vy=0;
         }
+        if(hitHead && !helium){bounce.ceilingContact();} // any head hit -> 100%
+        if(onLanding&&!wasSurface&&!helium&&impactSpeed>70){
+            if(bounce.landed()){
+                // Automatic small intermediate hop after a manual jump.
+                vy=-gravity*HOP;surface=false;coyote=0;
+            }
+        }
     }
+
     private void tick(float dt) {
         if(paused||complete)return;
         if(finishDelay>0){finishDelay-=dt;if(finishDelay<=0)next();return;}
@@ -140,13 +182,20 @@ final class GameView extends View {
         if(command!=0)vx+=command*(surface?1320f:860f)*dt;
         else vx*=Math.max(0,1-(surface?10f:3f)*dt);
         vx=clamp(vx,-SPEED,SPEED);
+        bounce.update(dt);
         jumpBuffer=Math.max(0,jumpBuffer-dt);
-        if(surface)coyote=.15f; else coyote=Math.max(0,coyote-dt);
-        if(jumpBuffer>0&&coyote>0){
-            vy=-gravity*JUMP;surface=false;coyote=0;jumpBuffer=0;
+        if(surface&&!helium)coyote=.15f; else coyote=Math.max(0,coyote-dt);
+        if(jumpBuffer>0&&!helium) {
+            float scale=bounce.jump(surface||coyote>0);
+            if(scale>0) {
+                vy=-gravity*JUMP*scale; // height is proportional to velocity squared
+                surface=false;coyote=0;jumpBuffer=0;
+                msg("Sprunghöhe: "+Math.round(bounce.currentHeight()*100)+" %");
+            }
         }
         moveHorizontal(vx*dt);
-        vy=clamp(vy+gravity*G*dt,-750,750);
+        if(helium)vy=clamp(vy-380f*dt,-170,220);
+        else vy=clamp(vy+gravity*G*dt,-900,900);
         moveVertical(vy*dt);
         // Explicitly dangerous gaps are separate from turquoise traversal shafts.
         for(LevelData.Shaft shaft:world().shafts) {
@@ -164,9 +213,31 @@ final class GameView extends View {
                 if(!collected[i]){collected[i]=true;score+=item.value;msg("+"+item.value+" Punkte");}
             }else if(item.type==LevelData.COLOR&&color!=item.value) {
                 color=item.value;msg("Farbe: "+colorName(color));
-            }else if(item.type==LevelData.GRAVITY&&gravity!=item.value) {
-                gravity=item.value;surface=false;coyote=0;vy=0;
+            }else if(item.type==LevelData.GRAVITY&&!helium&&gravity!=item.value) {
+                gravity=item.value;surface=false;coyote=0;vy=0;bounce.reset();
                 msg(gravity==LevelData.UP?"Schwerkraft nach oben":"Schwerkraft nach unten");
+            }
+        }
+        // Sockets require intentional, near-motionless placement, not collision.
+        int station=-1;
+        for(int i=0;i<world().items.size();i++){
+            LevelData.Item item=world().items.get(i);
+            if(item.type!=LevelData.HELIUM_FILL&&item.type!=LevelData.HELIUM_DRAIN)continue;
+            boolean modeFits=item.type==LevelData.HELIUM_FILL?!helium:helium;
+            if(modeFits && Math.abs(x-item.x)<10 && Math.abs(y-item.y)<19
+                    && Math.abs(vx)<27 && Math.abs(vy)<30) {station=i;break;}
+        }
+        if(station<0){activeStation=-1;charge=0;}
+        else{
+            if(station!=activeStation){activeStation=station;charge=0;}
+            charge+=dt;
+            if(charge>=.55f){
+                LevelData.Item item=world().items.get(station);
+                helium=item.type==LevelData.HELIUM_FILL;
+                gravity=helium?LevelData.UP:LevelData.DOWN;
+                bounce.reset();surface=false;coyote=0;vy=0;
+                charge=0;activeStation=-1;
+                msg(helium?"Helium eingefüllt – jetzt aufsteigen":"Helium abgepumpt");
             }
         }
         for(float[] cp:world().checkpoints) {
@@ -203,6 +274,7 @@ final class GameView extends View {
         shafts(c);
         blocks(c,vw,vh);
         for(LevelData.Gate gate:world().gates)drawGate(c,gate);
+        for(LevelData.ScoreGate gate:world().scoreGates)drawScoreGate(c,gate);
         for(int i=0;i<world().items.size();i++)drawItem(c,world().items.get(i),collected[i]);
         drawCheckpoints(c);
         exit(c);
