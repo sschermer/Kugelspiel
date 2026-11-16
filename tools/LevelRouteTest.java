@@ -138,12 +138,16 @@ public final class LevelRouteTest {
         }
         if(stage==8){
             ok(ups==0&&fills==1&&drains==1,"Helium factory has an irrelevant mechanic");
+            verifyHeliumChimney(w,2,35,49,36,48,1);
             ok(w.items.stream().anyMatch(i->i.type==LevelData.POINT &&
                     lane(i.y,w)==1 && i.y<floor(1)-2*T),
                     "Helium loft missing a collectible");
         }
-        if(stage==10)ok(ups==1&&downs==1&&fills==1&&drains==1,
-                "Final maze mechanics need a specific puzzle role");
+        if(stage==10){
+            ok(ups==1&&downs==1&&fills==1&&drains==1,
+                    "Final maze mechanics need a specific puzzle role");
+            verifyHeliumChimney(w,4,41,50,42,49,3);
+        }
         if(stage>=4)requireQuietSpaceLimited(w,stage);
 
         // Validate exact 19-unit divider geometry, bidirectional openings.
@@ -186,6 +190,39 @@ public final class LevelRouteTest {
                 " marks, openings "+w.shafts.size()+", score doors "+w.scoreGates.size()+
                 ", gravity "+ups+"/"+downs+", helium "+fills+"/"+drains);
     }
+    /**
+     * The ascent region is a two-level, enclosed vertical chimney. With
+     * the full middle floor removed, a 250%-height jump alone cannot reach
+     * the high reward; the reachable HE+ machine is the designed solution.
+     */
+    private static void verifyHeliumChimney(LevelData.Level w,int gapLane,
+            int leftWall,int rightWall,int leftGap,int rightGap,int topLane) {
+        for(int lane=gapLane-1;lane<=gapLane;lane++){
+            int row=(int)(floor(lane)/T);
+            for(int h=1;h<=4;h++) {
+                ok(w.tiles[row-h][leftWall]=='X'&&w.tiles[row-h][rightWall]=='X',
+                        "Helium chimney must have full-height side walls");
+            }
+        }
+        int floorRow=(int)(floor(gapLane)/T);
+        for(int col=leftGap;col<=rightGap;col++) {
+            ok(w.tiles[floorRow][col]=='.',
+                    "Helium chimney has an intermediate landing ledge");
+        }
+        int upperRow=(int)(floor(topLane)/T);
+        boolean upperOpen=false;
+        for(int col=leftGap;col<=rightGap;col++)
+            if(w.tiles[upperRow][col]=='.')upperOpen=true;
+        ok(upperOpen,"Helium chimney upper chamber has no opening");
+        boolean prize=false;
+        for(LevelData.Item i:w.items)
+            if(i.type==LevelData.POINT &&
+                    lane(i.y,w)==topLane &&
+                    i.y<floor(topLane)-2*T && i.x>=leftGap*T && i.x<=rightGap*T)
+                prize=true;
+        ok(prize,"Helium-only ceiling chamber has no functional point reward");
+    }
+
     private static void authoredStories() {
         LevelData.Level caves=LevelData.LEVELS.get(3);
         LevelData.Level tower=LevelData.LEVELS.get(4);
