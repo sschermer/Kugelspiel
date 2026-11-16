@@ -1,6 +1,16 @@
 # ORBIFLUX
 
-Eigenständiger nativer Android-2D-Puzzle-Platformer, **Iteration 013 / Version 0.13.0**.
+Eigenständiger nativer Android-2D-Puzzle-Platformer, **Iteration 014 / Version 0.14.0**.
+
+## Iteration 014: Zwei getrennte Eingabeverzögerungen von jeweils 200 ms
+
+Die neue Zwei-Hälften-Steuerung unterscheidet zwei Sprungarten. Beide Verzögerungen wurden auf **200 ms** festgelegt:
+
+- **Senkrechter Sprung aus der Ruhe:** Vor der ersten Berührung liegt kein Finger auf dem Display und die Kugel ruht. Die erste Berührung löst zunächst 200 ms lang keine Rollbewegung aus. Kommt der zweite Finger in dieser Zeit auf die gegenüberliegende Hälfte, wird ein senkrechter Sprung ausgelöst. Beide Finger gemeinsam gehalten sperren jede horizontale Bewegung. Nach dem Loslassen eines Fingers vergeht eine **zweite, separate Verzögerung von 200 ms**, erst danach beginnt die Kugel – auch in der Luft – in Richtung des verbleibenden Fingers zu beschleunigen. Bei Wegnahme des anderen Fingers gilt dieselbe Logik spiegelverkehrt.
+- **Ungebremster Bewegungssprung:** Liegt ein Finger schon länger an und steuert die Kugel (oder die Kugel ist bereits in Bewegung), löst ein zusätzlicher Finger auf der Gegenseite einen Sprung aus, **ohne die Geschwindigkeit zu verändern oder das Weiterbeschleunigen zu blockieren**. Nach Wegnahme des zweiten Fingers gibt es hier **keine zusätzliche Verzögerung**.
+- Bei genau 200 ms Abstand gilt die Geste noch als Startsprung; ab 201 ms als Bewegungssprung. Die anfängliche 200-ms-Bewegungsverzögerung greift nur beim Start aus dem Stand, nicht beim Betreten des Displays während die Kugel rollt. Die bisherige schnelle Loslassen-und-Wiederantippen-Geste bleibt erhalten.
+
+Die bisherige Standstill-Erkennungsgrenze (Bodenkontakt und unter 20 Welteinheiten/Sekunde horizontale Geschwindigkeit), die doppelte Maximalgeschwindigkeit 532 und die Drei-Tasten-Steuerung bleiben erhalten. Reine Java-Tests prüfen beide 200-ms-Grenzen, das Warten nach Fingerfreigabe im Flug, sowie ungebremste Bewegungssprünge.
 
 ## Iteration 013: Zwei-Finger-Sperre für die horizontale Bewegung
 
@@ -71,11 +81,11 @@ GitHub Actions verwendet Java 17, Gradle 8.10.2 und Android SDK 35. Vor dem Andr
 
 **Grenze dieser Tests:** Es gibt noch keinen vollständigen physikbasierten Spiel-Durchlauf. Insbesondere schwierige Wege zu allen Marken, das Timing der Helium-Apparaturen und mögliche Sackgassen müssen am Android-Gerät geprüft und gegebenenfalls korrigiert werden. Die Strukturprüfung ist keine Garantie, dass jeder Level tatsächlich komplett lösbar ist.
 
-Debug-Build per GitHub Actions und nach erfolgreichem Workflow als direkte Datei unter GitHub Releases (Vorabversion `v0.13.0-preview`).
+Debug-Build per GitHub Actions und nach erfolgreichem Workflow als direkte Datei unter GitHub Releases (Vorabversion `v0.14.0-preview`).
 
 ## Technische und rechtliche Angaben
 
-Der vorläufige App-Name lautet **ORBIFLUX** (Markenprüfung vor Veröffentlichung erforderlich). Das Chrome-Türkis-Launcher-Icon bleibt ohne Schrift. Die App-ID ist weiterhin `de.sschermer.kugelspiel`, `versionCode 13`. Für den Test dieser umfassend geänderten Karten startet ein eigener Level-Fortschritt unter `level_008`; ältere gespeicherte Fortschrittsdaten bleiben unabhängig davon im App-Speicher erhalten.
+Der vorläufige App-Name lautet **ORBIFLUX** (Markenprüfung vor Veröffentlichung erforderlich). Das Chrome-Türkis-Launcher-Icon bleibt ohne Schrift. Die App-ID ist weiterhin `de.sschermer.kugelspiel`, `versionCode 14`. Für den Test dieser umfassend geänderten Karten startet ein eigener Level-Fortschritt unter `level_008`; ältere gespeicherte Fortschrittsdaten bleiben unabhängig davon im App-Speicher erhalten.
 
 Alle Spielgrafiken sind selbst mit Android Canvas gezeichnet. Das Launcher-Icon ist ein eigens für dieses Projekt generiertes Chrom-Türkis-Motiv und als WebP eingebunden; Herkunft siehe `THIRD_PARTY_NOTICES.md`. Es wurden keine unklar lizenzierten Fremdassets oder Audiodateien übernommen. Die Rechte am eigenen Code und an der Grafik bleiben bis zur ausdrücklichen Lizenzentscheidung vorbehalten. Ein öffentliches GitHub-Repository ist nicht automatisch Open Source. Weitere Angaben: `THIRD_PARTY_NOTICES.md`.
 

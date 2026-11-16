@@ -1,98 +1,111 @@
 package de.sschermer.kugelspiel;
 
 public final class HalfScreenControlsTest {
-    private static void check(boolean condition,String message){
-        if(!condition)throw new AssertionError(message);
+    private static void check(boolean ok,String message){
+        if(!ok)throw new AssertionError(message);
     }
     private static void close(float actual,float expected,String message){
         if(Math.abs(actual-expected)>0.0001f)
-            throw new AssertionError(message+": "+actual+" != "+expected);
+            throw new AssertionError(message+" ("+actual+" vs "+expected+")");
     }
-    private static void frozenForFrames(HalfScreenControls c,int frames,long startTime,
-                                        float initialSpeed,String message){
-        float x=0,velocity=initialSpeed;
-        for(int i=0;i<frames;i++){
-            int direction=c.direction(startTime+i*8L);
-            velocity=HorizontalMotion.step(velocity,direction,true,c.bothSidesHeld(),
-                    1f/120f,532f);
-            x+=velocity/120f;
-            close(velocity,0f,message+" velocity frame "+i);
-            close(x,0f,message+" displacement frame "+i);
-        }
+    private static float step(HalfScreenControls c,long now,float velocity,boolean surface){
+        return HorizontalMotion.step(velocity,c.direction(now),surface,
+                c.blocksHorizontal(now),1f/120f,532f);
     }
     public static void main(String[] args){
         HalfScreenControls c=new HalfScreenControls();
-        check(!c.press(1,HalfScreenControls.RIGHT,1000,true),"initial press only steers");
-        check(c.direction(1099)==0,"100 ms starting delay remains active");
-        check(c.direction(1100)==HalfScreenControls.RIGHT,"movement starts at 100 ms");
 
-        // A fast second touch triggers jump and blocks sideways movement indefinitely.
-        check(c.press(2,HalfScreenControls.LEFT,1090,false),"fast opposite touch jumps");
-        check(c.bothSidesHeld(),"both zones detected");
-        check(c.isVerticalPair(),"fast pair gets correction");
-        frozenForFrames(c,360,1100,532f,"fast pair three-second hold");
-        c.release(2,4300);
-        check(!c.bothSidesHeld(),"release unlocks");
-        check(c.direction(4300)==HalfScreenControls.RIGHT,"direction resumes");
+        // First touch from rest has exactly 200 ms of movement delay.
+        check(!c.press(1,HalfScreenControls.RIGHT,1000,true),"first touch only steers");
+        check(c.direction(1000)==0&&c.direction(1199)==0,"start delay through 199 ms");
+        close(step(c,1199,35f,true),0f,"start delay cancels residual drift");
+        check(c.direction(1200)==HalfScreenControls.RIGHT,"movement begins at 200 ms");
         c.reset();
 
-        // Previously broken case: second finger arrives far after 180 ms.
-        check(!c.press(10,HalfScreenControls.LEFT,5000,true),"initial slow press");
-        check(c.direction(5500)==HalfScreenControls.LEFT,"one finger steers");
-        check(c.press(11,HalfScreenControls.RIGHT,5700,false),"late opposite press jumps");
-        check(!c.isVerticalPair(),"late pair has no takeoff rewind");
-        check(c.bothSidesHeld(),"late pair still locks movement");
-        frozenForFrames(c,600,5710,-532f,"late pair five-second hold");
-        c.release(10,10750);
-        check(!c.bothSidesHeld(),"releasing lead unlocks");
-        check(c.direction(10750)==HalfScreenControls.RIGHT,"remaining side takes control");
+        // Initial opposite-side contact within 200ms is a vertical jump.
+        c.press(2,HalfScreenControls.RIGHT,2000,true);
+        check(c.press(3,HalfScreenControls.LEFT,2199,false),"199 ms second finger jumps");
+        check(c.isVerticalPair(),"199 ms becomes vertical pair");
+        for(int i=0;i<360;i++){
+            close(step(c,2200+i*8L,532f,false),0f,
+                    "vertical pair remains motionless throughout jump");
+        }
+        // Release the original right finger while airborne. Wait exactly 200 ms.
+        c.release(2,2300);
+        check(!c.isVerticalPair(),"release ends vertical lock");
+        check(c.direction(2300)==0&&c.direction(2499)==0,
+                "left steering blocked 200 ms after release");
+        close(step(c,2499,532f,false),0f,"post-release window cancels velocity");
+        check(c.direction(2500)==HalfScreenControls.LEFT,
+                "remaining left finger takes over exactly at 200 ms");
+        check(step(c,2500,0f,false)<0f,"remaining finger accelerates left in air");
         c.reset();
 
-        // Moving ball gets stopped by a second finger; it never accelerates under a hold.
-        c.press(20,HalfScreenControls.RIGHT,12000,false);
-        check(c.direction(12000)==HalfScreenControls.RIGHT,"moving input immediate");
-        check(c.press(21,HalfScreenControls.LEFT,12300,false),"moving opposite touch jumps");
-        frozenForFrames(c,720,12300,532f,"moving ball six-second freeze");
-        c.release(21,19000);
-        check(c.direction(19000)==HalfScreenControls.RIGHT,"movement resumes only after release");
+        // Releasing the secondary finger leaves the original right finger.
+        c.press(4,HalfScreenControls.RIGHT,3000,true);
+        check(c.press(5,HalfScreenControls.LEFT,3050,false),"fast right/left pair");
+        c.release(5,3090);
+        check(c.direction(3289)==0,"right steering still delayed at 199 ms");
+        check(c.direction(3290)==HalfScreenControls.RIGHT,"right starts at 200 ms");
+        check(step(c,3290,0f,false)>0f,"rightward acceleration midair");
         c.reset();
 
-        // 100ms movement delay and 180ms takeoff correction are independent.
-        c.press(30,HalfScreenControls.LEFT,20000,true);
-        check(c.direction(20099)==0,"99 ms delay");
-        check(c.direction(20100)==HalfScreenControls.LEFT,"100 ms motion");
-        check(c.press(31,HalfScreenControls.RIGHT,20180,false),"180 ms jump");
-        check(c.isVerticalPair(),"180 ms takeoff position corrected");
-        frozenForFrames(c,90,20180,100f,"180 ms pair freeze");
+        // Inclusive 200 ms edge is vertical; 201 ms is directional.
+        c.press(6,HalfScreenControls.LEFT,4000,true);
+        check(c.press(7,HalfScreenControls.RIGHT,4200,false),"200 ms second finger jumps");
+        check(c.isVerticalPair(),"200 ms vertical boundary");
         c.reset();
-        c.press(40,HalfScreenControls.LEFT,21000,true);
-        check(c.press(41,HalfScreenControls.RIGHT,21181,false),"181 ms jump");
-        check(!c.isVerticalPair(),"181 ms no rewind");
-        check(c.direction(21200)==0,"181 ms nevertheless blocks movement");
+        c.press(8,HalfScreenControls.LEFT,5000,true);
+        check(c.press(9,HalfScreenControls.RIGHT,5201,false),"201 ms second finger jumps");
+        check(!c.isVerticalPair(),"201 ms stays directional");
+        check(c.direction(5201)==HalfScreenControls.LEFT,"first finger keeps steering");
         c.reset();
 
-        // Two fingers on the same side should not jump or freeze; dragging changes zones.
-        c.press(50,HalfScreenControls.LEFT,22000,false);
-        check(!c.press(51,HalfScreenControls.LEFT,22030,false),"same-side extra finger no jump");
-        check(!c.bothSidesHeld(),"same side is not a dual-zone lock");
-        check(c.direction(22050)==HalfScreenControls.LEFT,"same-side steering");
-        c.move(51,HalfScreenControls.RIGHT);
-        check(c.bothSidesHeld(),"crossing middle activates dual-zone lock");
-        frozenForFrames(c,240,22100,90f,"drag-created pair freeze");
-        c.release(51,24300);
-        check(c.direction(24300)==HalfScreenControls.LEFT,"dragged pointer release unlocks");
+        // Moving and delayed second-finger jumping are completely unbraked.
+        c.press(10,HalfScreenControls.RIGHT,6000,false);
+        check(c.direction(6000)==HalfScreenControls.RIGHT,"moving first touch has no delay");
+        check(c.press(11,HalfScreenControls.LEFT,6070,false),
+                "already moving ball jumps even under 200ms");
+        check(!c.isVerticalPair()&&c.direction(6070)==HalfScreenControls.RIGHT,
+                "moving jump retains steering");
+        float vx=420f;
+        for(int i=0;i<500;i++){
+            float old=vx;
+            vx=step(c,6070+i*8L,vx,false);
+            check(vx>=old,"holding second finger does not slow the rolling ball");
+        }
+        close(vx,532f,"maximal speed maintained with both fingers down");
+        c.release(11,11000);
+        check(c.direction(11000)==HalfScreenControls.RIGHT,
+                "regular movement jump has no post-release delay");
+        c.reset();
+        c.press(12,HalfScreenControls.LEFT,12000,false);
+        check(c.press(13,HalfScreenControls.RIGHT,12400,false),"left directional jump");
+        check(step(c,12400,-400f,false)<-400f,"left momentum is preserved");
         c.reset();
 
-        // Existing quick same-side retap still triggers a jump.
-        c.press(60,HalfScreenControls.RIGHT,25000,false);
-        c.release(60,25050);
-        check(c.press(61,HalfScreenControls.RIGHT,25200,true),"quick retap jumps");
-        c.release(61,25210);
-        check(!c.press(62,HalfScreenControls.RIGHT,25600,true),"slow retap only steers");
+        // Releasing both fingers clears delayed release state.
+        c.press(14,HalfScreenControls.RIGHT,13000,true);
+        c.press(15,HalfScreenControls.LEFT,13060,false);
+        c.release(15,13100);
+        c.release(14,13120);
+        check(c.direction(13140)==0,"no pointers => no steering");
+        check(!c.blocksHorizontal(14000),"empty display clears blocking");
         c.reset();
-        check(!c.press(63,HalfScreenControls.LEFT,25800,false),"reset clears tap history");
 
-        System.out.println("HalfScreenControlsTest OK: movement delay, 2-finger jump, long hold, "
-                +"late arrival, momentum cancellation, release, drag, retap");
+        // Same-side extras, dragging, quick retaps.
+        c.press(16,HalfScreenControls.LEFT,15000,false);
+        check(!c.press(17,HalfScreenControls.LEFT,15020,false),"same half not jump");
+        c.move(17,HalfScreenControls.RIGHT);
+        check(!c.isVerticalPair(),"drag does not create a vertical-start pair");
+        check(c.direction(15030)==HalfScreenControls.LEFT,"lead keeps direction");
+        c.release(17,15100);c.release(16,15110);
+        check(c.press(18,HalfScreenControls.LEFT,15200,true),"quick retap jumps");
+        c.release(18,15210);
+        check(!c.press(19,HalfScreenControls.LEFT,15500,true),"slow retap is not jump");
+        c.reset();
+
+        System.out.println("HalfScreenControlsTest OK: 200ms start, 200ms airborne release,"
+                +" straight jump, unbraked running jump, boundary and retap");
     }
 }

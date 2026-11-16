@@ -3,23 +3,24 @@ package de.sschermer.kugelspiel;
 import java.util.HashMap;
 
 /**
- * Invisible two-zone touch control. The first held finger steers; an additional
- * finger on the opposite side triggers one jump. As long as pointers occupy
- * opposite halves, horizontal input MUST remain blocked regardless of timing.
- * A 100 ms start delay and a 180 ms takeoff-position correction are separate.
+ * Invisible two-half steering and gesture recognition.
+ *
+ * From a finger-free screen and a stationary ball, the first contact has a
+ * 200 ms movement delay. An opposite-side second contact within that window
+ * triggers a vertical jump. After either finger is lifted, the remaining
+ * finger starts steering after another 200 ms, even if the ball is airborne.
+ *
+ * When steering has already begun, an opposite-side second finger jumps
+ * without braking or overriding the first finger's direction.
  */
 final class HalfScreenControls {
     static final int LEFT=1,RIGHT=2;
-    // First touch starts movement only after 100 ms when the ball is at rest.
-    static final long MOVEMENT_DELAY_MS=100L;
-    // Human two-thumb contacts can differ slightly more than the delay.
-    // A recent opposite touch still becomes a vertical jump, with x/vx
-    // restored to the original takeoff position by GameView.
-    static final long VERTICAL_PAIR_GRACE_MS=180L;
+    static final long START_DELAY_MS=200L;
+    static final long AFTER_VERTICAL_RELEASE_DELAY_MS=200L;
     private static final long RETAP_WINDOW_MS=260L;
     private final HashMap<Integer,Integer> sides=new HashMap<>();
     private int lead=-1,lastSide=0;
-    private long lastUp=-1,firstDown=-1;
+    private long lastUp=-1,firstDown=-1,releaseDelayUntil=-1;
     private boolean pendingStandstill=false,verticalPair=false;
 
     boolean press(int pointer,int side,long eventTime,boolean startingAtRest){
@@ -32,11 +33,12 @@ final class HalfScreenControls {
             firstDown=eventTime;
             pendingStandstill=startingAtRest;
             verticalPair=false;
+            releaseDelayUntil=-1;
         }
         sides.put(pointer,side);
         if(lead<0)lead=pointer;
         if(opposite&&pendingStandstill&&eventTime>=firstDown
-                &&eventTime-firstDown<=VERTICAL_PAIR_GRACE_MS){
+                &&eventTime-firstDown<=START_DELAY_MS){
             verticalPair=true;
             pendingStandstill=false;
         }
@@ -50,36 +52,46 @@ final class HalfScreenControls {
         }
     }
     void release(int pointer,long eventTime){
+        boolean wasVerticalPair=isVerticalPair();
         Integer side=sides.remove(pointer);
         if(side==null)return;
         if(sides.isEmpty()){
             lead=-1;lastSide=side;lastUp=eventTime;
-            firstDown=-1;pendingStandstill=false;verticalPair=false;
+            firstDown=-1;releaseDelayUntil=-1;
+            pendingStandstill=false;verticalPair=false;
         }else{
             if(lead==pointer)lead=sides.keySet().iterator().next();
             lastSide=0;lastUp=-1;
+            if(wasVerticalPair){
+                // The delay applies only after a vertical start jump.
+                releaseDelayUntil=eventTime+AFTER_VERTICAL_RELEASE_DELAY_MS;
+                pendingStandstill=false;
+            }
             if(!bothSides())verticalPair=false;
         }
     }
+    private boolean initialWait(long now){
+        return pendingStandstill&&firstDown>=0
+                &&now>=firstDown&&now-firstDown<START_DELAY_MS;
+    }
+    private boolean releaseWait(long now){
+        return !sides.isEmpty()&&releaseDelayUntil>=0
+                &&now<releaseDelayUntil;
+    }
+    boolean blocksHorizontal(long now){
+        // Unlike v0.13, a late second finger is NOT a movement lock.
+        return isVerticalPair()||initialWait(now)||releaseWait(now);
+    }
     int direction(long now){
         Integer side=sides.get(lead);
-        if(side==null)return 0;
-        // Never allow the lead finger to accelerate while both halves are held.
-        // This lock is independent of the 180-ms takeoff-correction window.
-        if(bothSides())return 0;
-        if(pendingStandstill&&now>=firstDown
-                &&now-firstDown<MOVEMENT_DELAY_MS)return 0;
-        return side;
+        return side==null||blocksHorizontal(now)?0:side;
     }
-    /** Hard movement lock whenever pointers occupy both half-screen zones. */
-    boolean bothSidesHeld(){return bothSides();}
-    /** Only used to undo the short start drift before a near-simultaneous jump. */
     boolean isVerticalPair(){return verticalPair&&bothSides();}
     private boolean bothSides(){
         return sides.containsValue(LEFT)&&sides.containsValue(RIGHT);
     }
     void reset(){
         sides.clear();lead=-1;lastSide=0;lastUp=-1;firstDown=-1;
-        pendingStandstill=false;verticalPair=false;
+        releaseDelayUntil=-1;pendingStandstill=false;verticalPair=false;
     }
 }

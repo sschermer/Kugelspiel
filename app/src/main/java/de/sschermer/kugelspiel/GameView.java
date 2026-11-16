@@ -195,10 +195,10 @@ final class GameView extends View {
 
         if(touchHalves)syncHalfMovement(android.os.SystemClock.uptimeMillis());
         int command=(right.isEmpty()?0:1)-(left.isEmpty()?0:1);
-        // A dual-zone hold overrides acceleration AND existing momentum.
-        // Both halves must stay motionless even when the second finger arrived late.
+        // Only a vertical-start pair and its 200 ms release delay lock movement.
+        // A second finger added during running never cancels momentum.
         vx=HorizontalMotion.step(vx,command,surface,
-                touchHalves&&halfControls.bothSidesHeld(),dt,SPEED);
+                touchHalves&&halfControls.blocksHorizontal(android.os.SystemClock.uptimeMillis()),dt,SPEED);
         bounce.update(dt);
         jumpBuffer=Math.max(0,jumpBuffer-dt);
         if(surface&&!helium)coyote=.15f; else coyote=Math.max(0,coyote-dt);
@@ -723,12 +723,12 @@ final class GameView extends View {
                         e.getEventTime(),startingAtRest);
                 if(jumpNow){
                     if(halfControls.isVerticalPair()){
-                        // Correct the small takeoff drift within 180 ms.
+                        // Keep the simultaneous start jump at its original takeoff x.
                         x=twoFingerTakeoffX;
                     }
-                    // Every opposite-half jump must halt horizontal momentum,
-                    // even when its second finger arrives later than 180 ms.
-                    if(halfControls.bothSidesHeld())vx=0f;
+                    // Only the initial near-simultaneous pair is stationary.
+                    // Later second-finger jumps retain full horizontal velocity.
+                    if(halfControls.isVerticalPair())vx=0f;
                     requestJump();
                 }
             }else if(action==MotionEvent.ACTION_MOVE){
