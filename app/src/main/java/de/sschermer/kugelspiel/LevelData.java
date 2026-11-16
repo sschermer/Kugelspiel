@@ -5,211 +5,222 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Curated data for ten increasingly long puzzle levels.
- * Coordinates are world units, not screen pixels.
- *
- * Gravity/color switches are persistent and repeatable.
- * Point tokens score only once per level; their inactive shells remain visible.
+ * Deterministic, tile-based, multi-storey puzzle maps. Everything visual is functional:
+ * stone blocks movement, safe turquoise shafts connect floors, red pits kill the ball.
  */
 final class LevelData {
-    static final int NONE=0, BLUE=1, AMBER=2, VIOLET=3;
-    static final int UP=-1, DOWN=1;
-    static final int CEILING=-1, MID=0, FLOOR=1, BOTH=2;
+    static final int NONE=0, BLUE=1, ORANGE=2, VIOLET=3;
+    static final int DOWN=1, UP=-1;
     static final int COLOR=1, GRAVITY=2, POINT=3;
-    static final float TOP=170f, BOTTOM=670f;
-
+    static final int TILE=58;
     static final class Item {
-        final float x, y;
-        final int lane, type, value;
-        Item(float x, float y, int lane, int type, int value) {
-            this.x=x; this.y=y; this.lane=lane; this.type=type; this.value=value;
-        }
-        boolean once() {return type==POINT;}
+        final float x,y; final int type,value;
+        Item(float x,float y,int type,int value){this.x=x;this.y=y;this.type=type;this.value=value;}
     }
     static final class Gate {
-        final float x;
-        final int lane,color;
-        Gate(float x,int lane,int color) {this.x=x;this.lane=lane;this.color=color;}
-        boolean blocks(int currentColor) {return currentColor!=color;}
+        final float x,top,bottom; final int color;
+        Gate(float x,float top,float bottom,int color){this.x=x;this.top=top;this.bottom=bottom;this.color=color;}
     }
-    static final class Segment {
-        final float from,to,y;
-        Segment(float from,float to,float y){this.from=from;this.to=to;this.y=y;}
-    }
-    static final class Hazard {
-        final float x,base;
-        Hazard(float x,float base){this.x=x;this.base=base;}
-    }
-    static final class Branch {
-        final float x;
-        final int lower,upper;
-        final boolean gated,challenging;
-        Branch(float x,int lower,int upper,boolean gated,boolean challenging){
-            this.x=x;this.lower=lower;this.upper=upper;this.gated=gated;this.challenging=challenging;
-        }
+    static final class Shaft {
+        final float x1,x2,top,bottom;final boolean safe;
+        Shaft(float a,float b,float y1,float y2,boolean s){x1=a;x2=b;top=y1;bottom=y2;safe=s;}
     }
     static final class Level {
+        final int columns, rows, stories, target;
         final String name,tip;
-        final float finish;
-        final int target;
+        final char[][] tiles;
         final List<Item> items;
         final List<Gate> gates;
-        final List<Segment> gaps,ledges;
-        final List<Hazard> spikes;
-        final List<Float> checkpoints;
-        final List<Branch> branches;
+        final List<Shaft> shafts;
+        final List<float[]> checkpoints;
+        final float startX,startY,exitX,exitY;
         Level(Builder b){
-            name=b.name; tip=b.tip; finish=b.finish; target=b.target;
+            columns=b.width;stories=b.stories;rows=b.rows;target=b.target;
+            name=b.name;tip=b.tip;
+            tiles=new char[rows][columns];
+            for(int r=0;r<rows;r++)System.arraycopy(b.grid[r],0,tiles[r],0,columns);
             items=Collections.unmodifiableList(new ArrayList<>(b.items));
             gates=Collections.unmodifiableList(new ArrayList<>(b.gates));
-            gaps=Collections.unmodifiableList(new ArrayList<>(b.gaps));
-            ledges=Collections.unmodifiableList(new ArrayList<>(b.ledges));
-            spikes=Collections.unmodifiableList(new ArrayList<>(b.spikes));
+            shafts=Collections.unmodifiableList(new ArrayList<>(b.shafts));
             checkpoints=Collections.unmodifiableList(new ArrayList<>(b.checkpoints));
-            branches=Collections.unmodifiableList(new ArrayList<>(b.branches));
+            startX=b.startX;startY=b.startY;exitX=b.exitX;exitY=b.exitY;
         }
-        int availablePoints(){
-            int score=0;for(Item item:items)if(item.type==POINT)score+=item.value;
-            return score;
+        boolean solid(int col,int row){
+            if(col<0||col>=columns||row<0)return true;
+            if(row>=rows)return false;
+            return tiles[row][col]=='#';
+        }
+        int pointsAvailable(){
+            int sum=0;for(Item item:items)if(item.type==POINT)sum+=item.value;
+            return sum;
         }
     }
     static final class Builder {
+        final int width,stories,rows,target;
         final String name,tip;
-        final float finish;
-        final int target;
-        final List<Item> items=new ArrayList<>();
-        final List<Gate> gates=new ArrayList<>();
-        final List<Segment> gaps=new ArrayList<>(),ledges=new ArrayList<>();
-        final List<Hazard> spikes=new ArrayList<>();
-        final List<Float> checkpoints=new ArrayList<>();
-        final List<Branch> branches=new ArrayList<>();
-        Builder(String name,String tip,float finish,int target){
-            this.name=name;this.tip=tip;this.finish=finish;this.target=target;
-        }
-        Builder point(float x,int lane,int value){
-            float y=lane==FLOOR?BOTTOM-40:lane==CEILING?TOP+40:BOTTOM-122;
-            items.add(new Item(x,y,lane,POINT,value));return this;
-        }
-        Builder switchColor(float x,int lane,int value){
-            items.add(new Item(x,lane==CEILING?TOP+44:BOTTOM-44,lane,COLOR,value));return this;
-        }
-        Builder switchGravity(float x,int lane,int value){
-            items.add(new Item(x,lane==CEILING?TOP+44:BOTTOM-44,lane,GRAVITY,value));return this;
-        }
-        Builder gate(float x,int lane,int color) {
-            gates.add(new Gate(x,lane,color));return this;
-        }
-        Builder pit(float from,float to) {
-            gaps.add(new Segment(from,to,BOTTOM));return this;
-        }
-        Builder ledge(float from,float to,float top) {
-            ledges.add(new Segment(from,to,top));return this;
-        }
-        Builder spike(float x) {
-            spikes.add(new Hazard(x,BOTTOM));return this;
-        }
-        Builder checkpoint(float x) {
-            checkpoints.add(x);return this;
-        }
-        Builder branch(float x,boolean advanced,boolean hazard,boolean upperRich,int variant) {
-            int topReward=upperRich?10:5, bottomReward=upperRich?5:10;
-            branches.add(new Branch(x,bottomReward,topReward,advanced,hazard));
-            // The floor gravity switch can be bypassed with a generous jump.
-            // This permits two genuinely different paths through the room.
-            switchGravity(x+95,FLOOR,UP);
-            if(advanced) {
-                int floorColor=variant%3==0?AMBER:variant%3==1?VIOLET:BLUE;
-                int roofColor=variant%3==0?BLUE:variant%3==1?AMBER:VIOLET;
-                switchColor(x+310,FLOOR,floorColor);
-                switchColor(x+390,CEILING,roofColor);
-                gate(x+610,FLOOR,floorColor);
-                gate(x+610,CEILING,roofColor);
+        final char[][] grid;
+        final ArrayList<Item> items=new ArrayList<>();
+        final ArrayList<Gate> gates=new ArrayList<>();
+        final ArrayList<Shaft> shafts=new ArrayList<>();
+        final ArrayList<float[]> checkpoints=new ArrayList<>();
+        final float startX,startY,exitX,exitY;
+        Builder(int width,int stories,int target,String name,String tip){
+            this.width=width;this.stories=stories;this.target=target;this.name=name;this.tip=tip;
+            rows=floor(stories-1)+4;grid=new char[rows][width];
+            for(int r=0;r<rows;r++){
+                for(int col=0;col<width;col++)grid[r][col]='.';
+                grid[r][0]='#';grid[r][1]='#';
+                grid[r][width-2]='#';grid[r][width-1]='#';
             }
-            point(x+475,FLOOR,bottomReward);
-            point(x+485,CEILING,topReward);
-            // On the upper route the explicit down switch joins both paths.
-            switchGravity(x+705,CEILING,DOWN);
-            if(hazard) {
-                // Short, forgiving gap, plus reachable optional bonus ledge.
-                pit(x+548,x+613);
-                ledge(x+496,x+677,BOTTOM-91);
-                point(x+605,MID,5);
-                spike(x+778);
+            for(int lane=0;lane<stories;lane++){
+                for(int col=2;col<width-2;col++){
+                    grid[roof(lane)][col]='#';
+                    grid[floor(lane)][col]='#';
+                }
             }
-            checkpoint(x+915);
-            point(x+992,FLOOR,1);
-            return this;
+            startX=4.5f*TILE;
+            startY=floor(0)*TILE-15;
+            int endCol=(stories-1)%2==0?width-5:4;
+            exitX=(endCol+.5f)*TILE;
+            exitY=floor(stories-1)*TILE-92;
+        }
+        int floor(int lane){return 6+6*lane;}
+        int roof(int lane){return floor(lane)-5;}
+        float floorY(int lane){return floor(lane)*TILE;}
+        float ceilingY(int lane){return (roof(lane)+1)*TILE;}
+        float pathX(int lane,float fraction){
+            float from=5.5f, to=width-6.5f;
+            return (lane%2==0?from+(to-from)*fraction:to-(to-from)*fraction)*TILE;
+        }
+        void point(float x,float y,int val){items.add(new Item(x,y,POINT,val));}
+        void color(float x,float y,int val){items.add(new Item(x,y,COLOR,val));}
+        void gravity(float x,float y,int direction){items.add(new Item(x,y,GRAVITY,direction));}
+        void floorItem(int lane,float pos,int type,int value){
+            float x=pathX(lane,pos),y=floorY(lane)-32;
+            if(type==POINT)point(x,y,value);
+            if(type==COLOR)color(x,y,value);
+            if(type==GRAVITY)gravity(x,y,value);
+        }
+        void roofItem(int lane,float pos,int type,int value){
+            float x=pathX(lane,pos),y=ceilingY(lane)+33;
+            if(type==POINT)point(x,y,value);
+            if(type==COLOR)color(x,y,value);
+            if(type==GRAVITY)gravity(x,y,value);
+        }
+        void gate(int lane,float fraction,int color){
+            float x=pathX(lane,fraction);
+            gates.add(new Gate(x,floorY(lane)-183,floorY(lane)-4,color));
+        }
+        void platform(int lane,float fraction,int value) {
+            float x=pathX(lane,fraction);
+            int from=Math.round(x/TILE)-2;
+            int row=floor(lane)-2;
+            for(int i=from;i<from+5;i++)
+                if(i>=2&&i<width-2)grid[row][i]='#';
+            point((from+2.5f)*TILE,row*TILE-29,value);
+        }
+        void shaft(int lane,int center,boolean safe){
+            if(lane>=stories-1)return;
+            int left=Math.max(3,Math.min(width-6,center-2));
+            int right=left+4;
+            // Both structural barrier rows must be open.
+            for(int col=left;col<=right;col++){
+                grid[floor(lane)][col]='.';
+                grid[roof(lane+1)][col]='.';
+            }
+            float top=floor(lane)*TILE;
+            float bottom=(roof(lane+1)+1)*TILE;
+            shafts.add(new Shaft(left*TILE,(right+1)*TILE,top,bottom,safe));
+        }
+        void lethalPit(int lane,int col){
+            int left=col-1;
+            if(left<3||left+2>=width-3)return;
+            for(int i=left;i<=left+2;i++) {
+                grid[floor(lane)][i]='.';
+                if(lane<stories-1)grid[roof(lane+1)][i]='.';
+            }
+            float y=floorY(lane);
+            shafts.add(new Shaft(left*TILE,(left+3)*TILE,y,y+TILE*1.8f,false));
+        }
+        void checkpoint(int lane,float fraction){
+            checkpoints.add(new float[]{pathX(lane,fraction),floorY(lane)-22});
         }
         Level build(){return new Level(this);}
     }
+    static final List<Level> LEVELS=make();
 
-    static final List<Level> LEVELS=create();
+    private static List<Level> make(){
+        ArrayList<Level> result=new ArrayList<>();
+        int[] widths={27,35,43,56,66,78,89,100,111,125};
+        int[] stories={1,1,2,3,3,4,4,5,5,6};
+        String[] names={
+            "Punkte und Ausgang","Farben und Tore","Durch die Öffnung",
+            "Erstes Labyrinth","Der verschlungene Pfad","Unter der Oberfläche",
+            "Vier Etagen","Die Umwege","Mehrere Ebenen","Der große Irrgarten"
+        };
+        String[] tips={
+            "Schwarze Punkte sammeln. Weißlich = bereits gesammelt.",
+            "Der Farbwechsler öffnet das gleichfarbige Tor.",
+            "Türkis markiert einen sicheren Durchgang in die Tiefe.",
+            "Mehrere Ebenen und Wege. Erkunde die Karte.",
+            "Farben, Ebenen und Punkte verbinden.",
+            "Rot markierte Löcher sind tödlich. Türkis ist sicher.",
+            "Achte auf Wege über und unter dir.",
+            "Zwischenebenen bieten zusätzliche Punkte.",
+            "Suche die ergiebigen Wege zum Ausgang.",
+            "Wähle deine Route und sammle genügend Punkte."
+        };
+        for(int index=0;index<10;index++){
+            int height=stories[index];
+            int target=(index<2?6:(height*7)+Math.max(0,height-2)*4);
+            Builder b=new Builder(widths[index],height,target,names[index],tips[index]);
 
-    private static List<Level> create() {
-        List<Level> a=new ArrayList<>();
-        a.add(new Builder("Punktelandung",
-                "Sammle mindestens 6 Punkte. Jedes Punkte-Item zählt nur einmal.",1100,6)
-                .point(270,FLOOR,1).point(595,FLOOR,5).point(860,FLOOR,1).build());
-
-        a.add(new Builder("Farbiges Tor",
-                "Eine starke Farbe öffnet das passende Tor. Punkte öffnen den Ausgang.",1380,6)
-                .switchColor(255,FLOOR,BLUE).point(385,FLOOR,1)
-                .gate(650,BOTH,BLUE).point(860,FLOOR,5)
-                .point(1130,FLOOR,1).build());
-
-        a.add(new Builder("Oben oder unten?",
-                "Am Bodenschalter geht es zur Decke. Überspringen führt unten weiter.",1780,10)
-                .point(250,FLOOR,1)
-                .branch(440,false,false,true,0).build());
-
-        a.add(new Builder("Zwei Spuren",
-                "Beide Wege haben eigene Farb-Items und Tore.",2050,10)
-                .point(250,FLOOR,1)
-                .branch(500,true,false,true,1).build());
-
-        a.add(new Builder("Der doppelte Weg",
-                "Entscheide bei jeder Abzweigung neu; Sammelwege lohnen sich.",3000,18)
-                .point(240,FLOOR,1)
-                .branch(370,true,false,true,2)
-                .branch(1580,true,false,false,3).build());
-
-        a.add(new Builder("Schlucht und Steg",
-                "Ein Sprung über die Schlucht erreicht zusätzliche Punkte.",3230,18)
-                .point(245,FLOOR,1)
-                .branch(370,true,false,true,4)
-                .branch(1640,true,true,false,5).build());
-
-        a.add(new Builder("Drei Entscheidungen",
-                "Sichere Wege sind möglich, aber nicht immer punktreich.",4100,28)
-                .point(240,FLOOR,1)
-                .branch(355,true,false,false,6)
-                .branch(1540,true,false,true,7)
-                .branch(2725,true,true,true,8).build());
-
-        a.add(new Builder("Umkehrpunkte",
-                "Nutze die unveränderten Schalter, um fehlende Punkte nachzuholen.",4390,29)
-                .point(235,FLOOR,1)
-                .branch(350,true,true,true,9)
-                .branch(1625,true,false,false,10)
-                .branch(2890,true,true,true,11).build());
-
-        a.add(new Builder("Vier Routen",
-                "Verschiedene Wege liefern verschieden viele Punkte.",5490,37)
-                .point(245,FLOOR,1)
-                .branch(350,true,false,true,12)
-                .branch(1590,true,true,false,13)
-                .branch(2840,true,false,true,14)
-                .branch(4100,true,true,false,15).build());
-
-        a.add(new Builder("Der große Irrgarten",
-                "Erkunde die Wege, wähle deine Farben und erreiche 40 Punkte.",6030,40)
-                .point(245,FLOOR,1)
-                .branch(350,true,true,false,16)
-                .branch(1720,true,false,true,17)
-                .branch(3070,true,true,false,18)
-                .branch(4430,true,true,true,19).build());
-
-        return Collections.unmodifiableList(a);
+            for(int lane=0;lane<height;lane++){
+                // Always achievable floor-route score (1+5+1).
+                b.floorItem(lane,.13f,POINT,1);
+                b.floorItem(lane,.43f,POINT,5);
+                b.floorItem(lane,.73f,POINT,1);
+                if(index>=1){
+                    int color=(index+lane)%3+1;
+                    b.floorItem(lane,.24f,COLOR,color);
+                    b.gate(lane,.61f,color);
+                }
+                if(index>=2){
+                    // Gravity-shift detour to ceiling; can be skipped with jump.
+                    b.floorItem(lane,.31f,GRAVITY,UP);
+                    b.roofItem(lane,.47f,POINT,5);
+                    b.roofItem(lane,.54f,GRAVITY,DOWN);
+                }
+                if(index>=3) {
+                    // An optional intermediate platform: a controllable jump earns 10.
+                    b.platform(lane,.81f,10);
+                }
+                if(lane<height-1){
+                    int mainCenter=(lane%2==0?width-7:6);
+                    b.shaft(lane,mainCenter,true);
+                    if(index>=3){
+                        // Alternative connector: skip part of the corridor or return to it.
+                        b.shaft(lane,width/2+(lane%2==0?-3:3),true);
+                        // Reversible vertical exploration from the lower floor.
+                        float optionalX=(width/2+(lane%2==0?-3:3))*TILE;
+                        b.gravity(optionalX+4*TILE,b.floorY(lane+1)-35,UP);
+                        b.gravity(optionalX+5*TILE,b.ceilingY(lane)+35,DOWN);
+                    }
+                }
+                if(index>=5 && lane%2==0 && lane<height-1) {
+                    // Rare, short lethal pit with physically separate red warning.
+                    int col=lane%2==0?width/3:width*2/3;
+                    boolean intersects=false;
+                    for(Shaft s:b.shafts)
+                        if(s.safe&&s.top==b.floorY(lane) && col*TILE>s.x1-3*TILE && col*TILE<s.x2+3*TILE)
+                            intersects=true;
+                    if(!intersects)b.lethalPit(lane,col);
+                }
+                if(index>=4)b.checkpoint(lane,.84f);
+            }
+            result.add(b.build());
+        }
+        return Collections.unmodifiableList(result);
     }
     private LevelData(){}
 }
