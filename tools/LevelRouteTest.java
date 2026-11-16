@@ -43,7 +43,7 @@ public final class LevelRouteTest {
         Queue<State> queue=new ArrayDeque<>();
         HashSet<State> visited=new HashSet<>();
         queue.add(new State(0,LevelData.NONE,LevelData.DOWN,false));
-        boolean found=false,foundWithBacktrack=false;
+        boolean found=false,foundWithBacktrack=false,foundWithoutBacktrack=false;
         int iterations=0;
         while(!queue.isEmpty()) {
             State state=queue.remove();
@@ -51,7 +51,7 @@ public final class LevelRouteTest {
             if(++iterations>20000)throw new AssertionError("Solver runaway");
             if(state.pos==nodes.size()-1) {
                 found=true;
-                if(state.back)foundWithBacktrack=true;
+                if(state.back)foundWithBacktrack=true; else foundWithoutBacktrack=true;
                 continue;
             }
             for(int delta:new int[]{-1,1}) {
@@ -71,7 +71,8 @@ public final class LevelRouteTest {
             }
         }
         if(!found)throw new AssertionError("No route for "+(index+1)+" "+level.title);
-        if(index>=4&&!foundWithBacktrack)throw new AssertionError("Expected backtrack: "+level.title);
+        if(index>=4 && foundWithoutBacktrack)throw new AssertionError("Backtracking is not required in "+level.title);
+        if(index>=4 && !foundWithBacktrack)throw new AssertionError("Missing backtrack route: "+level.title);
         System.out.println("Level "+(index+1)+": "+level.title+" / reachable; explored "+iterations+" states");
     }
     public static void main(String[] args) {
