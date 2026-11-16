@@ -12,6 +12,7 @@ public final class LevelRouteTest {
     private static void require(boolean ok,String text){if(!ok)throw new AssertionError(text);}
     private static int col(float x){return (int)Math.floor(x/LevelData.TILE);}
     private static int row(float y){return (int)Math.floor(y/LevelData.TILE);}
+    private static float TILE(){return LevelData.TILE;}
     private static boolean close(float a,float b){return Math.abs(a-b)<0.01f;}
     private static float roomFloor(int lane){return (6+5*lane)*LevelData.TILE;}
     private static float roomCeiling(int lane){
@@ -61,8 +62,14 @@ public final class LevelRouteTest {
             require(s.x2>s.x1 && s.bottom>s.top,"Malformed shaft "+i);
             require(close(s.bottom-s.top,LevelData.DIVIDER_THICKNESS),
                     "Shaft is thicker than the shared divider in level "+i);
-            require(close(s.x2-s.x1,3f*LevelData.TILE),
-                    "Shaft width is not the compact 3-tile opening in level "+i);
+            float opening=s.x2-s.x1;
+            if(i>=4 && i<=6 && s.safe) {
+                require(opening>=3f*LevelData.TILE && opening<=9f*LevelData.TILE,
+                    "Handcrafted opening outside 3..9 tile range in level "+i);
+            }else{
+                require(close(opening,3f*LevelData.TILE),
+                    "Standard 3-tile shaft width changed in level "+i);
+            }
             require(s.x1>2*LevelData.TILE && s.x2<(w.columns-2)*LevelData.TILE,
                 "Shaft intersects outer wall "+i);
             int a=col(s.x1+2),b=col(s.x2-2),r=row(s.top+2);
@@ -113,6 +120,19 @@ public final class LevelRouteTest {
             require(w.scoreGates.size()>=1,"Later mazes should contain score doors");
         }
         if(i>=4)require(tens>=w.stories,"Advanced stages require optional ten-pointers "+i);
+        if(i>=4 && i<=6) {
+            // Distinct authored levels must contain at least one real full-block
+            // rock and one collapsed gallery wider than regular passage holes.
+            int rock=0,slabs=0;
+            for(int r=0;r<w.rows;r++)for(int c=2;c<w.columns-2;c++){
+                if(w.tiles[r][c]=='X')rock++;
+                if(w.tiles[r][c]=='#' && r>1)slabs++;
+            }
+            require(rock>=1,"Handcrafted level has no physical rock "+i);
+            require(w.shafts.stream().anyMatch(s->s.safe && s.x2-s.x1>=4*TILE()),
+                "Handcrafted level has no broad partial-floor opening "+i);
+            require(slabs>=2,"Handcrafted level has no functional intermediate platforms "+i);
+        }
         int[][] count=new int[w.rows][w.columns];
         for(LevelData.Shaft s:w.shafts){
             int lane=(row(s.top+1)-6)/5;
@@ -125,11 +145,61 @@ public final class LevelRouteTest {
                     LevelData.DIVIDER_THICKNESS),
                     "Storey has a hidden thick gap in level "+i);
         }
+        if(i==4 || i==5 || i==6)checkAuthoredPuzzle(w,i);
         System.out.println("Stage "+i+" | "+w.columns+" x "+w.rows+
             " tiles | "+w.stories+" floors | safe shafts "+w.shafts.stream().filter(s->s.safe).count()+
             " | lethal pits "+w.shafts.stream().filter(s->!s.safe).count()+
             " | available "+all+" / required "+w.target);
     }
+    private static void checkAuthoredPuzzle(LevelData.Level w,int stage) {
+        if(stage==4){
+            require(w.columns==56 && w.stories==3 && w.shafts.size()>=8,
+                    "Cave must have three floors and varied cross-connecting routes");
+            require(w.name.equals("Verzweigte Höhlen"),"Cave design name changed");
+            require(w.scoreGates.stream().anyMatch(g->g.threshold==16),
+                    "Cave must include a 16-point chamber");
+            int pre=0;
+            for(LevelData.Item item:w.items)
+                if(item.type==LevelData.POINT && item.x<37.5f*TILE()
+                        && item.y<roomFloor(0))pre+=item.value;
+            require(pre>=16,"Cave first room cannot open its score gate");
+        }else if(stage==5) {
+            require(w.columns==66 && w.stories==4,"Tower requires four vertical floors");
+            require(w.name.equals("Der Sprungturm"),"Tower design name changed");
+            require(w.items.stream().anyMatch(t->t.type==LevelData.HELIUM_FILL),
+                    "Tower needs optional helium ascent");
+            require(w.scoreGates.stream().anyMatch(g->g.threshold==18),
+                    "Tower needs an 18-point middle gate");
+            // The 26->28 platform is intentionally disconnected by a missing step.
+            int r=(6-3);
+            require(w.tiles[r][26]=='#' && w.tiles[r][24]=='.',
+                    "Tower's missing stair has become continuous");
+        }else {
+            require(w.columns==78 && w.stories==4,"Two-world layout changed");
+            require(w.name.equals("Zwei Welten"),"Split world name changed");
+            require(w.scoreGates.size()==4,"Both worlds must be separated across all floors");
+            int gateX=col(w.scoreGates.get(0).x);
+            for(LevelData.ScoreGate door:w.scoreGates){
+                require(col(door.x)==gateX && door.threshold==28,
+                        "A door allows bypassing the 28-point partition");
+                require(gateSealsFullRoom(door.top,door.bottom,w),
+                        "A split-world door does not reach floor or ceiling");
+            }
+            int left=0,right=0;
+            for(LevelData.Item token:w.items){
+                if(token.type!=LevelData.POINT)continue;
+                if(token.x<gateX*TILE())left+=token.value;
+                else right+=token.value;
+            }
+            require(left>=28 && left<w.target,
+                    "Split-world left side must open door but cannot finish alone");
+            require(left+right>=w.target && right>=10,
+                    "Split-world right side must supply meaningful points");
+            require(w.exitX<gateX*TILE(),
+                    "Split-world player should need to return to left exit");
+        }
+    }
+
     public static void main(String[] args){
         require(LevelData.LEVELS.size()==10,"10 levels required");
         int previousWidth=0,previousStories=0;
