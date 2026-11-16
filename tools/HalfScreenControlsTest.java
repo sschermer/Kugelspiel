@@ -9,7 +9,12 @@ public final class HalfScreenControlsTest {
             throw new AssertionError(message+" ("+actual+" vs "+expected+")");
     }
     private static float step(HalfScreenControls c,long now,float velocity,boolean surface){
-        return HorizontalMotion.step(velocity,c.direction(now),surface,
+        // UI direction constants (LEFT=1, RIGHT=2) are not signed physics commands.
+        // Mirror GameView.syncHalfMovement before calling the physics helper.
+        int side=c.direction(now);
+        int command=side==HalfScreenControls.LEFT?-1:
+                side==HalfScreenControls.RIGHT?1:0;
+        return HorizontalMotion.step(velocity,command,surface,
                 c.blocksHorizontal(now),1f/120f,532f);
     }
     public static void main(String[] args){
