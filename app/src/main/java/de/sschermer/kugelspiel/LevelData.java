@@ -174,7 +174,7 @@ final class LevelData {
                 .branch(1580,true,false,false,3).build());
 
         a.add(new Builder("Schlucht und Steg",
-                "Ein Sprung über die Schlucht erreicht zusätzliche Punkte.",3230,21)
+                "Ein Sprung über die Schlucht erreicht zusätzliche Punkte.",3230,18)
                 .point(245,FLOOR,1)
                 .branch(370,true,false,true,4)
                 .branch(1640,true,true,false,5).build());
@@ -187,7 +187,7 @@ final class LevelData {
                 .branch(2725,true,true,true,8).build());
 
         a.add(new Builder("Umkehrpunkte",
-                "Nutze die unveränderten Schalter, um fehlende Punkte nachzuholen.",4390,30)
+                "Nutze die unveränderten Schalter, um fehlende Punkte nachzuholen.",4390,29)
                 .point(235,FLOOR,1)
                 .branch(350,true,true,true,9)
                 .branch(1625,true,false,false,10)
@@ -202,7 +202,7 @@ final class LevelData {
                 .branch(4100,true,true,false,15).build());
 
         a.add(new Builder("Der große Irrgarten",
-                "Erkunde die Wege, wähle deine Farben und erreiche 42 Punkte.",6030,42)
+                "Erkunde die Wege, wähle deine Farben und erreiche 40 Punkte.",6030,40)
                 .point(245,FLOOR,1)
                 .branch(350,true,true,false,16)
                 .branch(1720,true,false,true,17)
